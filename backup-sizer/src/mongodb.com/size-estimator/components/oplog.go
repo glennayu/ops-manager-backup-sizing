@@ -1,10 +1,11 @@
-package estimator
+package components
 
 import (
-"fmt"
-"gopkg.in/mgo.v2"
+	"fmt"
+	"gopkg.in/mgo.v2"
 	"github.com/mongodb/slogger/v1/slogger"
 	"gopkg.in/mgo.v2/bson"
+	"time"
 )
 
 func gbPerDay(oplogColl *mgo.Collection) (float32, error) {
@@ -12,8 +13,6 @@ func gbPerDay(oplogColl *mgo.Collection) (float32, error) {
 	if err != nil {
 		return 0, err
 	}
-
-	fmt.Printf("First time: %d \t Last time: %d\n", last, first)
 
 	totalTime := last - first // in seconds
 
@@ -28,8 +27,6 @@ func gbPerDay(oplogColl *mgo.Collection) (float32, error) {
 	const MB = 1024 * 1024
 
 	gbPerDay := float32(size) * ratio / MB
-
-	fmt.Printf("time: %d \t size: %d \t ratio: %f \t gbPerDay: %f \n", totalTime, size, ratio, gbPerDay)
 
 	return gbPerDay, nil
 }
@@ -55,8 +52,8 @@ func oplogTime(oplogCollection *mgo.Collection) (int, int, error) {
 
 	switch  {
 	case "2.4" <= v && v < "2.6":
-		firstMTS = times["start"]
-		lastMTS = times["end"]
+		firstMTS = times["start"].(bson.MongoTimestamp)
+		lastMTS = times["end"].(bson.MongoTimestamp)
 	case "2.6" <= v:
 		firstMTS = times["earliestOptime"].(bson.MongoTimestamp)
 		lastMTS = times["latestOptime"].(bson.MongoTimestamp)
@@ -65,16 +62,54 @@ func oplogTime(oplogCollection *mgo.Collection) (int, int, error) {
 	first := int(firstMTS >> 32)
 	last := int(lastMTS >> 32)
 
-	fmt.Println("First: ", first, "Last: ", last)
 	return first, last, nil
 }
 
 
-func compressionRatio(oplogColl *mgo.Collection) (float64, error) {
-	return 0, nil
-	// TODO
+func compressionRatio(oplogColl *mgo.Collection, timeInterval time.Duration) (float32, error) {
+	const MB = 1024 * 1024
+
+	slicer := NewSlicer(100, 10,
+		10 * MB,
+		15 * MB,
+		new(SnappyCompressor),
+		3*time.Second,
+	)
+
+	sliceChan := make(chan float32)
+
+	const MaxSlicesBeforeSend = 10
+	go slicer.Stream(sliceChan)
+
+	defer slicer.Kill()
+
+	oplogStartTS := bson.MongoTimestamp(
+		time.Now().Add(-1 * timeInterval).Unix() << 32,
+//		int64(1434730006) << 32 | int64(9801),
+//		int64(1434729970) << 32 | int64(0),
+	)
+
+	qry := bson.M{
+		"ts": bson.M{"$gte": oplogStartTS},
+}
+	oplogIter := oplogColl.Find(qry).LogReplay().Iter() //Tail(time.Second)
+	var newOplog *bson.D = new(bson.D)
+
+	for oplogIter.Next(newOplog) == true {
+		if docWritten := slicer.WriteDoc(newOplog); docWritten == false {
+			return 0, nil //Errorf(slogger.ERROR, "Failed to enqueue an oplog.")
+		}
+		newOplog = new(bson.D)
+	}
+	slicer.Close()
+
+	return getCompressionRatio(sliceChan), nil
 }
 
+func getCompressionRatio(sliceChan chan float32) float32{
+	ret := <- sliceChan
+	return ret
+}
 
 func getOplogColl(session *mgo.Session) (*mgo.Collection, error) {
 	oplog := session.DB("local").C("oplog.rs")
@@ -95,17 +130,22 @@ func OplogSize(uri string, session *mgo.Session) (float32, error) {
 
 	oplogColl, err := getOplogColl(session)
 	if err != nil {
-		fmt.Printf("welp", err)
 		return 0, err
 	}
 
 
 	gb, err := gbPerDay(oplogColl)
 	if err != nil {
-		return gb, err
+		return 0, err
 	}
 	fmt.Println("GB per day: ", gb)
-	compressionRatio(oplogColl)
+
+	timeInterval := 3 * time.Hour // TODO: make this a command line option
+	cr, err := compressionRatio(oplogColl, timeInterval)
+	if err != nil {
+		return 0, err
+	}
+	fmt.Println("compression ratio : ", cr)
 
 	return 0, nil
 }

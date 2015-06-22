@@ -1,8 +1,10 @@
-package estimator
+package components
+
 import (
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/mgo.v2"
 	"github.com/mongodb/slogger/v1/slogger"
+	"strings"
 )
 
 
