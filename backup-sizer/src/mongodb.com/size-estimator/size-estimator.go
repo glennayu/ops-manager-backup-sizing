@@ -9,21 +9,19 @@ import (
 
 func main() {
 	port := os.Args[1]
-	fmt.Println(os.Args)
 	uri := fmt.Sprintf("localhost:%s", port)
-	session, err := mgo.Dial(uri)
 
+	session, err := mgo.Dial(uri)
 	if err != nil {
-		fmt.Println(err.Error())
-		panic(err)
+		fmt.Printf("Failed to dial MongoDB on port %v. Err %v", port, err)
+		os.Exit(1)
 	}
 	defer session.Close()
 
 	err = session.Ping();
-
 	if err != nil {
-		fmt.Println(err.Error())
-		panic(err)
+		fmt.Printf("Failed to dial MongoDB on port %v. Err %v", port, err)
+		os.Exit(1)
 	}
 
 	fmt.Printf("Successfully pinged %s\n", uri);
