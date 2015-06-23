@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gopkg.in/mgo.v2"
 	"os"
+	"ops-manager-backup-sizing/backup-sizer/src/mongodb.com/size-estimator/components"
 )
 
 
@@ -25,4 +26,6 @@ func main() {
 	}
 
 	fmt.Printf("Successfully pinged %s\n", uri);
+
+	components.OplogSize(uri, session)
 }

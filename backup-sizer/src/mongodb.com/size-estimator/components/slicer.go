@@ -49,15 +49,15 @@ minSliceSize int,
 maxSliceSize int,
 compressor Compressor,
 timeout time.Duration,
-//oplogStart *OplogID,
+oplogStart *OplogID,
 //logger slogger.Logger,
 ) *Slicer {
 
 	// Initialize FirstDoc and LastDoc with reasonable dummy values
 	var lastDocSent *bson.D
-//	if oplogStart != nil {
-//		lastDocSent = &bson.D{{"ts", oplogStart.TS}, {"h", oplogStart.Hash}}
-//	}
+	if oplogStart != nil {
+		lastDocSent = &bson.D{{"ts", oplogStart.TS}, {"h", oplogStart.Hash}}
+	}
 
 	return &Slicer{
 		Docs:         make(chan *bson.D, inputCapacity),
@@ -158,22 +158,18 @@ func (slicer *Slicer) Stream(sliceChan chan float32) {
 
 	for {
 		slice, moreSlices, err := slicer.Slice()
-//		fmt.Println("slicer.Slice()")
 		if err != nil {
 			slicer.errorChan <- err
 			slicer.Kill()
 			return
 		}
 
-//		fmt.Println("slicer.writeSlice()")
 		if slice != nil && slicer.writeSlice(slice) == false {
 			break
 		}
 
 		uncompressedSize += slice.UnzippedSize
 		compressedSize += len(slice.Buffer.Bytes())
-
-//		fmt.Println("********", uncompressedSize, compressedSize)
 
 		if moreSlices == false {
 			break

@@ -6,7 +6,13 @@ import (
 	"github.com/mongodb/slogger/v1/slogger"
 	"gopkg.in/mgo.v2/bson"
 	"time"
+	"errors"
 )
+
+type OplogID struct {
+	TS   bson.MongoTimestamp `bson:"ts"`
+	Hash int64               `bson:"h"`
+}
 
 func gbPerDay(oplogColl *mgo.Collection) (float32, error) {
 	first, last, err := oplogTime(oplogColl)
@@ -74,41 +80,36 @@ func compressionRatio(oplogColl *mgo.Collection, timeInterval time.Duration) (fl
 		15 * MB,
 		new(SnappyCompressor),
 		3*time.Second,
+		nil,
 	)
 
-	sliceChan := make(chan float32)
+	resChan := make(chan float32)
 
 	const MaxSlicesBeforeSend = 10
-	go slicer.Stream(sliceChan)
+	go slicer.Stream(resChan)
 
 	defer slicer.Kill()
 
 	oplogStartTS := bson.MongoTimestamp(
 		time.Now().Add(-1 * timeInterval).Unix() << 32,
-//		int64(1434730006) << 32 | int64(9801),
-//		int64(1434729970) << 32 | int64(0),
 	)
 
 	qry := bson.M{
 		"ts": bson.M{"$gte": oplogStartTS},
 }
-	oplogIter := oplogColl.Find(qry).LogReplay().Iter() //Tail(time.Second)
+	oplogIter := oplogColl.Find(qry).LogReplay().Iter()
 	var newOplog *bson.D = new(bson.D)
 
 	for oplogIter.Next(newOplog) == true {
 		if docWritten := slicer.WriteDoc(newOplog); docWritten == false {
-			return 0, nil //Errorf(slogger.ERROR, "Failed to enqueue an oplog.")
+			return 0, errors.New("Failed to enqueue an oplog")
 		}
 		newOplog = new(bson.D)
 	}
 	slicer.Close()
 
-	return getCompressionRatio(sliceChan), nil
-}
-
-func getCompressionRatio(sliceChan chan float32) float32{
-	ret := <- sliceChan
-	return ret
+	ret := <-resChan
+	return ret, nil
 }
 
 func getOplogColl(session *mgo.Session) (*mgo.Collection, error) {
