@@ -144,12 +144,12 @@ func (slicer *Slicer) writeSlice(slice *Slice) bool {
 	}
 }
 
-func (slicer *Slicer) Stream(sliceChan chan float32) {
+func (slicer *Slicer) Stream(resChan chan float32) {
 	defer func() {
 		// Let consumers of this channel know that there
 		// aren't any more slices coming.
 		close(slicer.Slices)
-		close(sliceChan)
+		close(resChan)
 	}()
 
 	uncompressedSize := 0
@@ -178,8 +178,7 @@ func (slicer *Slicer) Stream(sliceChan chan float32) {
 			slicer.Logf(slogger.DEBUG, "%v document(s) in channel to be compressed", len(slicer.Docs))
 		}
 	}
-//	fmt.Println("slicer pushing val to sliceChan")
-	sliceChan <- float32(uncompressedSize) / float32(compressedSize)
+	resChan <- float32(uncompressedSize) / float32(compressedSize)
 }
 
 func (slicer *Slicer) Consume(consumeFunc SliceConsumer, maxSlicesBeforeSend int) {

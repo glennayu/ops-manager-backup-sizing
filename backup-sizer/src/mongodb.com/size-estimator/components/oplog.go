@@ -2,11 +2,11 @@ package components
 
 import (
 	"fmt"
-	"gopkg.in/mgo.v2"
-	"github.com/mongodb/slogger/v1/slogger"
-	"gopkg.in/mgo.v2/bson"
 	"time"
 	"errors"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/slogger/v1/slogger"
 )
 
 type OplogID struct {
@@ -15,14 +15,17 @@ type OplogID struct {
 }
 
 func gbPerDay(oplogColl *mgo.Collection) (float32, error) {
-	first, last, err := oplogTime(oplogColl)
+	first, last, err := GetOplogStartEnd(oplogColl)
 	if err != nil {
 		return 0, err
 	}
 
 	totalTime := last - first // in seconds
 
-	_, size, err := isCapped(oplogColl)
+	capped, size, err := isCapped(oplogColl)
+	if !capped {
+		return 0, fmt.Errorf("%s is not capped", oplogColl.FullName)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -38,7 +41,7 @@ func gbPerDay(oplogColl *mgo.Collection) (float32, error) {
 }
 
 
-func oplogTime(oplogCollection *mgo.Collection) (int, int, error) {
+func GetOplogStartEnd(oplogCollection *mgo.Collection) (int, int, error) {
 	var result (bson.M)
 	session := oplogCollection.Database.Session
 	if err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"oplog", 1}}, &result); err != nil {
@@ -98,8 +101,7 @@ func compressionRatio(oplogColl *mgo.Collection, timeInterval time.Duration) (fl
 	defer slicer.Kill()
 
 	oplogStartTS := bson.MongoTimestamp(
-		0,
-//		time.Now().Add(-1 * timeInterval).Unix() << 32,
+		time.Now().Add(-1 * timeInterval).Unix() << 32,
 	)
 
 	qry := bson.M{

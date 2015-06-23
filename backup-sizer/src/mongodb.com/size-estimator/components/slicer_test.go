@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const extraBytes = 30
+
 func generateDocs(output chan<- *bson.D, numBytes uint64) {
 	var bytesGenerated uint64 = 0
 	bytesVal := bytes.Repeat([]byte{0}, 5*1024)
@@ -24,18 +26,20 @@ func generateDocs(output chan<- *bson.D, numBytes uint64) {
 	close(output)
 }
 
-func readOutputSlices(input <-chan *Slice) (int, int, []*Slice) {
+func readOutputSlices(input <-chan *Slice) (int, int, int, []*Slice) {
 	numSlices := 0
 	numDocs := 0
+	compressedSize := 0
 	slices := make([]*Slice, 0)
 
 	for slice := range input {
 		numSlices++
 		numDocs += slice.NumDocs
+		compressedSize += slice.Buffer.Len()
 		slices = append(slices, slice)
 	}
 
-	return numSlices, numDocs, slices
+	return numSlices, numDocs, compressedSize, slices
 }
 
 const (
@@ -67,7 +71,8 @@ func TestDocumentSlicer(test *testing.T) {
 	go generateDocs(source, 100*1024)
 	go slicer.Stream(resChan)
 
-	numSlices, numDocs, _ := readOutputSlices(destination)
+	cr := <- resChan
+	numSlices, numDocs, compressedSize, _ := readOutputSlices(destination)
 	if numSlices != 7 {
 		test.Errorf("Expected slices: 7. Received: %d", numSlices)
 	}
@@ -75,6 +80,16 @@ func TestDocumentSlicer(test *testing.T) {
 	if numDocs != 20 {
 		test.Errorf("Expected docs: 20. Received: %d", numDocs)
 	}
+
+	totalSize := float32(100*1024 + extraBytes * numDocs)
+	expectedCR := totalSize / float32(compressedSize)
+	// sanity check - reasonable bounds on
+	if cr < 0.95 * expectedCR || cr > 1.05 * expectedCR {
+		test.Errorf("Expected compression ratio: %f. Received: %f",
+		expectedCR,
+		cr)
+	}
+
 }
 
 func TestLargeDocuments(test *testing.T) {
@@ -97,7 +112,8 @@ func TestLargeDocuments(test *testing.T) {
 	go generateDocs(source, 25*1024)
 	go slicer.Stream(resChan)
 
-	numSlices, numDocs, slices := readOutputSlices(destination)
+	cr := <- resChan
+	numSlices, numDocs, compressedSize, slices := readOutputSlices(destination)
 	if numSlices != 6 {
 		test.Errorf("Expected slices: 6. Received: %d", numSlices)
 	}
@@ -118,5 +134,13 @@ func TestLargeDocuments(test *testing.T) {
 
 	if numDocs != 5 {
 		test.Errorf("Expected docs: 5. Received: %d", numDocs)
+	}
+
+	totalSize := float32(25*1024 + extraBytes * numDocs) // extra bytes per doc
+	// sanity check
+	if cr * float32(compressedSize) != totalSize {
+		test.Errorf("Expected compression ratio: %f. Received: %f",
+			totalSize / float32(compressedSize),
+			cr)
 	}
 }
