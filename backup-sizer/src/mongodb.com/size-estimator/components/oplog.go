@@ -87,11 +87,19 @@ func compressionRatio(oplogColl *mgo.Collection, timeInterval time.Duration) (fl
 
 	const MaxSlicesBeforeSend = 10
 	go slicer.Stream(resChan)
+	// hack just to make sure slices are being removed from slicer.Slices channel
+	go slicer.Consume(
+		func(slices []*Slice) error {
+			return nil
+		},
+		MaxSlicesBeforeSend,
+	)
 
 	defer slicer.Kill()
 
 	oplogStartTS := bson.MongoTimestamp(
-		time.Now().Add(-1 * timeInterval).Unix() << 32,
+		0,
+//		time.Now().Add(-1 * timeInterval).Unix() << 32,
 	)
 
 	qry := bson.M{
@@ -127,27 +135,27 @@ func getOplogColl(session *mgo.Session) (*mgo.Collection, error) {
 }
 
 
-func OplogSize(uri string, session *mgo.Session) (float32, error) {
+func OplogSize(uri string, session *mgo.Session) (float32, float32, error) {
 
 	oplogColl, err := getOplogColl(session)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 
 	gb, err := gbPerDay(oplogColl)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	fmt.Println("GB per day: ", gb)
 
 	timeInterval := 3 * time.Hour // TODO: make this a command line option
 	cr, err := compressionRatio(oplogColl, timeInterval)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	fmt.Println("compression ratio : ", cr)
 
-	return 0, nil
+	return gb, cr, nil
 }
 

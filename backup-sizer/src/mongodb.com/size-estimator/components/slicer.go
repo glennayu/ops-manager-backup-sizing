@@ -138,7 +138,6 @@ func (slicer *Slicer) writeSlice(slice *Slice) bool {
 
 	select {
 	case slicer.Slices <- slice:
-		<- slicer.Slices
 		return true
 	case <-slicer.shutdownChan:
 		return false
