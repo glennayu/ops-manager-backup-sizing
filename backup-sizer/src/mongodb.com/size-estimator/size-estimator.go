@@ -20,7 +20,7 @@ func main() {
 
 	err = session.Ping();
 	if err != nil {
-		fmt.Printf("Failed to dial MongoDB on port %v. Err %v", port, err)
+		fmt.Printf("Failed to contact server on %s. Err %v", uri, err)
 		os.Exit(1)
 	}
 
