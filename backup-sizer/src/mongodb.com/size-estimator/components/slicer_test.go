@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-const extraBytes = 30
-
 func generateDocs(output chan<- *bson.D, numBytes uint64) {
 	var bytesGenerated uint64 = 0
 	bytesVal := bytes.Repeat([]byte{0}, 5*1024)
@@ -81,9 +79,9 @@ func TestDocumentSlicer(test *testing.T) {
 		test.Errorf("Expected docs: 20. Received: %d", numDocs)
 	}
 
-	totalSize := float32(100*1024 + extraBytes * numDocs)
+	totalSize := float32(100*1024)
 	expectedCR := totalSize / float32(compressedSize)
-	// sanity check - reasonable bounds on
+	// sanity check - reasonable bounds on what the estimated compression ratio might be
 	if cr < 0.95 * expectedCR || cr > 1.05 * expectedCR {
 		test.Errorf("Expected compression ratio: %f. Received: %f",
 		expectedCR,
@@ -136,9 +134,10 @@ func TestLargeDocuments(test *testing.T) {
 		test.Errorf("Expected docs: 5. Received: %d", numDocs)
 	}
 
-	totalSize := float32(25*1024 + extraBytes * numDocs) // extra bytes per doc
-	// sanity check
-	if cr * float32(compressedSize) != totalSize {
+	totalSize := float32(25*1024)
+	expectedCR := totalSize / float32(compressedSize)
+	// sanity check - reasonable bounds on what the estimated compression ratio might be
+	if cr < 0.95 * expectedCR || cr > 1.05 * expectedCR {
 		test.Errorf("Expected compression ratio: %f. Received: %f",
 			totalSize / float32(compressedSize),
 			cr)

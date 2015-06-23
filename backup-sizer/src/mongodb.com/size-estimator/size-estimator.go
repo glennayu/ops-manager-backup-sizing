@@ -21,6 +21,7 @@ func main() {
 
 	err = session.Ping();
 	if err != nil {
+
 		fmt.Printf("Failed to contact server on %s. Err %v", uri, err)
 		os.Exit(1)
 	}
