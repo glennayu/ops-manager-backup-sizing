@@ -28,5 +28,11 @@ func main() {
 
 	fmt.Printf("Successfully pinged %s\n", uri);
 
-	components.OplogSize(uri, session)
+	oplogStats, err := components.GetOplogStats(uri, session)
+	if err != nil {
+		fmt.Printf("Failed to get oplog stats on server %s. Err: %v", uri, err)
+		os.Exit(1)
+	}
+	fmt.Printf("OplogStats: %v", oplogStats)
+
 }

@@ -65,11 +65,11 @@ func TestUpdatedStartEnd(test *testing.T) {
 
 	insertDocuments(session, "test", "test", numDocs)
 
-//	oplogColl, err := getOplogColl(session)
+	//	oplogColl, err := getOplogColl(session)
 	oplogColl := session.DB("local").C("oplog.rs")
-//	if err != nil {
-//		test.Fatal("Error getting oplog. Error:%s", err.Error())
-//	}
+	//	if err != nil {
+	//		test.Fatal("Error getting oplog. Error:%s", err.Error())
+	//	}
 
 	start1, end1, err := GetOplogStartEnd(oplogColl)
 	if err != nil {
