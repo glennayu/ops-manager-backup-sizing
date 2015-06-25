@@ -13,6 +13,8 @@ import (
 
 const replset_port = 27017
 const standalone_port = 26000
+const dbName = "test"
+const collName = "test"
 
 func dial(port int) *mgo.Session {
 	addr := "localhost:" + strconv.Itoa(port)
@@ -25,7 +27,7 @@ func dial(port int) *mgo.Session {
 }
 
 func insertDocuments(mongo *mgo.Session, database string, collection string, numInsert int) {
-	session := mongo.Copy()
+	session := mongo.Clone()
 	defer session.Close()
 
 	session.SetMode(mgo.Strong, false)
@@ -144,9 +146,6 @@ func TestGetIterator(test *testing.T) {
 	session := dial(replset_port)
 	defer session.Close()
 
-	const dbName = "test"
-	const collName = "test"
-
 	session.DB(dbName).DropDatabase()
 
 	coll := session.DB(dbName).C(collName)
@@ -212,10 +211,8 @@ func TestCompressionRatio(test *testing.T) {
 	session := dial(replset_port)
 	defer session.Close()
 
-	const dbName = "test"
-	const collName = "test"
 
-	session.DB("test").DropDatabase()
+	session.DB(dbName).DropDatabase()
 
 	coll := session.DB(dbName).C(collName)
 	coll.Create(&mgo.CollectionInfo{})
@@ -258,7 +255,7 @@ func TestCompressionRatio(test *testing.T) {
 		test.Fatalf("Failed to get compression ratio for collection %v", coll)
 	}
 	if math.IsNaN(float64(crRand)) {
-		test.Errorf("compressing last 3 seconds of repeated bytes - received %v", crSame)
+		test.Errorf("compressing random bytes - received %v", crSame)
 	}
 
 	if crRand > crSame {
@@ -280,12 +277,13 @@ func TestCompressionRatio(test *testing.T) {
 func TestGetOplogInfo(test *testing.T) {
 	// oplog doesn't exist
 	sessionSingle := dial(standalone_port)
+	defer sessionSingle.Close()
+
 	info, err := GetOplogInfo(sessionSingle)
 	if err == nil {
 		test.Errorf("Expected error for nonexistent oplog. Result: %d",
-			info)
+		info)
 	}
-	sessionSingle.Close()
 
 	session := dial(replset_port)
 	defer session.Close()
@@ -295,11 +293,11 @@ func TestGetOplogInfo(test *testing.T) {
 		test.Fatal("Error getting oplogInfo")
 	}
 
-	session.DB("test").DropDatabase()
-	session.DB("test").C("test").Create(&mgo.CollectionInfo{})
+	session.DB(dbName).DropDatabase()
+	session.DB(dbName).C(collName).Create(&mgo.CollectionInfo{})
 
 	const numDocs = 10
-	insertDocuments(session, "test", "test", numDocs)
+	insertDocuments(session, dbName, collName, numDocs)
 
 
 	info2, err := GetOplogInfo(session)
@@ -314,7 +312,7 @@ func TestGetOplogInfo(test *testing.T) {
 
 	time.Sleep(5*time.Second)
 	size := info2.size
-	generateBytes(session, "test", "test", uint64(size), bytesSame)
+	generateBytes(session, dbName, collName, uint64(size), bytesSame)
 
 	// should have rolled over - should have a new start
 	info3, err := GetOplogInfo(session)

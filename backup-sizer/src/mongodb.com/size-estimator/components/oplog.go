@@ -5,7 +5,6 @@ import (
 	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"github.com/mongodb/slogger/v1/slogger"
 	"bytes"
 	"github.com/golang/snappy/snappy"
 	"fmt"
@@ -21,19 +20,14 @@ type OplogStats struct {
 	startTS              bson.MongoTimestamp
 	endTS                bson.MongoTimestamp
 	size                 int
-	sizePerDay           float32
-	compressedSizePerDay float32
+	gbPerDay			 float64
+	compressionRatio	 float64
+	compressedGbPerDay	 float64
 }
 
-func GbPerDay(info *OplogInfo) (float64, error) {
-	mb, err := MbPerDay(info)
-	if err != nil {
-		return 0, err
-	}
-	return float64(mb) / 1024, nil
-}
+var OplogNotFoundError = errors.New("local.oplog.rs does not seem to exist.")
 
-func MbPerDay(info *OplogInfo) (float32, error) {
+func (info *OplogInfo) GbPerDay() (float64, error) {
 	first := int32(info.startTS >> 32)
 	last := int32(info.endTS >> 32)
 	size := info.size
@@ -50,14 +44,13 @@ func MbPerDay(info *OplogInfo) (float32, error) {
 	}
 
 	const secPerDay = 60 * 60 * 24
-	ratio := float32(secPerDay) / float32(totalTime)
+	ratio := float64(secPerDay) / float64(totalTime)
 
-	const MB = 1024 * 1024
-	sizeInMB := float32(size) / float32(MB)
+	const GB = 1024 * 1024 * 1024
+	sizeInGB := float64(size) / float64(GB)
 
-	mbPerDay := sizeInMB * ratio
-
-	return mbPerDay, nil
+	gbPerDay := sizeInGB * ratio
+	return gbPerDay, nil
 }
 
 func GetOplogIterator(startTime time.Time, timeInterval time.Duration,
@@ -78,7 +71,7 @@ session *mgo.Session) (*mgo.Iter, error) {
 	return oplogColl.Find(qry).LogReplay().Iter(), nil
 }
 
-func CompressionRatio(iter *mgo.Iter) (float32, error) {
+func CompressionRatio(iter *mgo.Iter) (float64, error) {
 	const MB = 1024 * 1024
 
 	var doc *bson.D = new(bson.D)
@@ -97,34 +90,31 @@ func CompressionRatio(iter *mgo.Iter) (float32, error) {
 
 		dataBuffer.Write(docBytes)
 		doc = new(bson.D)
+
 		if len(dataBuffer.Bytes()) > minSize {
-			compressed, uncompressed, err =
-			compressResults(&dataBuffer, compressed, uncompressed)
+			uncompressed = uncompressed + len(dataBuffer.Bytes())
+
+			compressedBytes, err := snappy.Encode(nil, dataBuffer.Bytes())
 			if err != nil {
-				return 0, nil
+				return 0, err
 			}
+			compressed = compressed + len(compressedBytes)
+
 			dataBuffer.Reset()
 		}
 	}
 
 	if len(dataBuffer.Bytes()) != 0 {
-		var err error
-		compressed, uncompressed, err =
-		compressResults(&dataBuffer, compressed, uncompressed)
+		uncompressed = uncompressed + len(dataBuffer.Bytes())
+
+		compressedBytes, err := snappy.Encode(nil, dataBuffer.Bytes())
 		if err != nil {
 			return 0, err
 		}
+		compressed = compressed + len(compressedBytes)
 	}
 
-	return float32(uncompressed) / float32(compressed), nil
-}
-
-func compressResults(data *bytes.Buffer, compressed, uncompressed int) (int, int, error) {
-	compressedBytes, err := snappy.Encode(nil, data.Bytes())
-	if err != nil {
-		return 0, 0, err
-	}
-	return compressed + len(compressedBytes), uncompressed + len(data.Bytes()), nil
+	return float64(uncompressed) / float64(compressed), nil
 }
 
 func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
@@ -133,7 +123,7 @@ func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.New("Oplog does not seem to exist")
+		return nil, OplogNotFoundError
 	}
 
 	var result (bson.M)
@@ -143,22 +133,11 @@ func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
 
 	times := result["oplog"].(bson.M)
 
-	v, err := getMongodVersion(session)
-	if err != nil {
-		return nil, err
-	}
-
 	var firstMTS bson.MongoTimestamp
 	var lastMTS bson.MongoTimestamp
 
-	switch  {
-	case "2.4" <= v && v < "2.6":
-		firstMTS = times["start"].(bson.MongoTimestamp)
-		lastMTS = times["end"].(bson.MongoTimestamp)
-	case "2.6" <= v:
-		firstMTS = times["earliestOptime"].(bson.MongoTimestamp)
-		lastMTS = times["latestOptime"].(bson.MongoTimestamp)
-	}
+	firstMTS = times["earliestOptime"].(bson.MongoTimestamp)
+	lastMTS = times["latestOptime"].(bson.MongoTimestamp)
 
 	size, err := getOplogSize(session)
 	if err != nil {
@@ -210,7 +189,7 @@ func getOplogColl(session *mgo.Session) (*mgo.Collection, error) {
 	}
 
 	if exists == false {
-		return nil, slogger.NewStackError("`local.oplog.rs` does not seem to exist.")
+		return nil, OplogNotFoundError
 	}
 
 	return oplog, nil
@@ -221,17 +200,17 @@ func GetOplogStats(session *mgo.Session, timeInterval time.Duration) (*OplogStat
 	if err != nil {
 		return nil, err
 	}
+	gb, err := oplogInfo.GbPerDay()
+	if err != nil {
+		return nil, err
+	}
 
 	iter, err := GetOplogIterator(time.Now(), timeInterval, session)
+	defer iter.Close()
+
 	if err != nil {
 		return nil, err
 	}
-
-	mb, err := MbPerDay(oplogInfo)
-	if err != nil {
-		return nil, err
-	}
-
 	cr, err := CompressionRatio(iter)
 	if err != nil {
 		return nil, err
@@ -241,8 +220,9 @@ func GetOplogStats(session *mgo.Session, timeInterval time.Duration) (*OplogStat
 		oplogInfo.startTS,
 		oplogInfo.endTS,
 		oplogInfo.size,
-		mb,
+		gb,
 		cr,
+		cr * gb,
 	}, nil
 }
 
