@@ -1,6 +1,7 @@
 backup-sizer/bin
 backup-sizer/pkg
 backup-sizer/src/mongodb.com/size-estimator/size-estimator
+backup-sizer/src/mongodb.com/size-estimator/components/merp
 .idea
 ops-manager-backup-sizing.iml
 *~
