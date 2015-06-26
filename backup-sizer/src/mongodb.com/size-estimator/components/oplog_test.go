@@ -76,23 +76,24 @@ numBytes uint64, mode int) {
 
 type oplogInfoTest struct {
 	info     *OplogInfo
-	expected float32
+	expected float64
 	desc     string
 }
 
-func TestMbPerDay(test *testing.T) {
+func TestGbPerDay(test *testing.T) {
 	const MB = 1024*1024
+	const GB = 1024*1024*1024
 	const SecPerDay = 86400
 
 	testCases := []oplogInfoTest{
 		{&OplogInfo{
 			bson.MongoTimestamp(int64(0) << 32),
 			bson.MongoTimestamp(int64(SecPerDay) << 32),
-			MB}, 1, "basic"},
+			GB}, 1, "basic"},
 		{&OplogInfo{
 			bson.MongoTimestamp(time.Now().Unix() << 32),
 			bson.MongoTimestamp(time.Now().Add(72 * time.Hour).Unix() << 32),
-			193 * MB}, float32(193) / float32(3), "normal case"},
+			193 * MB}, float64(193) / float64(1024 * 3), "normal case"},
 		{&OplogInfo{
 			bson.MongoTimestamp(0),
 			bson.MongoTimestamp(0),
@@ -100,11 +101,11 @@ func TestMbPerDay(test *testing.T) {
 		{&OplogInfo{
 			bson.MongoTimestamp(int64(5) << 32 | 0),
 			bson.MongoTimestamp(int64(5) << 32 | 5),
-			1 * MB}, 1 * SecPerDay, "total time < 1 second, with multiple entries"},
+			1 * GB}, 1 * SecPerDay, "total time < 1 second, with multiple entries"},
 		{&OplogInfo{
 			bson.MongoTimestamp(int64(5) << 32 | 5),
 			bson.MongoTimestamp(int64(5) << 32 | 5),
-			1 * MB}, 1 * SecPerDay, "total time < 1 second, with one entry"},
+			1 * GB}, 1 * SecPerDay, "total time < 1 second, with one entry"},
 	}
 
 	for _, testCase := range testCases {
@@ -112,23 +113,13 @@ func TestMbPerDay(test *testing.T) {
 		expected := testCase.expected
 		desc := testCase.desc
 
-		mb, err := MbPerDay(info)
+		gb, err := info.GbPerDay()
 		if err != nil {
-			test.Errorf("Failure getting MB per day. Err %v", err)
+			test.Errorf("Failure getting GB per day. Err %v", err)
 		}
-		if mb != expected {
+		if gb != expected {
 			test.Errorf("Testing %s, OplogInfo %v, expected %f mb per day written, received %f",
-				desc, info, expected, mb)
-		}
-
-		expectedGb := float64(testCase.expected / 1024)
-		gb, err := GbPerDay(info)
-		if err != nil {
-			test.Errorf("Failure getting MB per day. Err %v", err)
-		}
-		if gb != expectedGb {
-			test.Errorf("Testing %s, OplogInfo %v, expected %f mb per day written, received %f",
-				desc, info, expectedGb, gb)
+				desc, info, expected, gb)
 		}
 	}
 
@@ -136,7 +127,7 @@ func TestMbPerDay(test *testing.T) {
 		bson.MongoTimestamp(time.Now().Unix() << 32),
 		bson.MongoTimestamp(time.Now().Add(-1 * time.Hour).Unix() << 32),
 		1*MB}
-	gb, err := GbPerDay(&info)
+	gb, err := info.GbPerDay()
 	if err == nil {
 		test.Errorf("Expected error for start > end. Result: %f", gb)
 	}

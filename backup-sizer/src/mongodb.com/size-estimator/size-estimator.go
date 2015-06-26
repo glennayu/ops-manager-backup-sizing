@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"gopkg.in/mgo.v2"
 	"os"
-	"./mongodb.com/size-estimator/components"
+	. "mongodb.com/size-estimator/components"
 	"flag"
 	"time"
 	"reflect"
@@ -63,7 +63,6 @@ func Run() {
 	for iter := 0; iter < numIter; iter++ {
 		start := time.Now()
 		Iterate()
-		continue
 		sleep := RemainingSleepTime(start)
 		time.Sleep(sleep)
 	}
@@ -81,16 +80,22 @@ func Iterate() {
 	}
 	defer session.Close()
 
-	oplogStats, err := components.GetOplogStats(session, sleepTime)
+	oplogStats, err := GetOplogStats(session, sleepTime)
 	if err != nil {
 		fmt.Printf("Failed to get oplog stats on server %s. Err: %v", uri, err)
 		os.Exit(1)
 	}
-	printVals(oplogStats)
+
+	stats := []interface{}{
+		oplogStats,
+	}
+
+//	printVals(oplogStats)
+	printVals(&stats)
 }
 
 func printFields() {
-	oplog := &components.OplogStats{}
+	oplog := &OplogStats{}
 	s := reflect.ValueOf(oplog).Elem()
 
 	var buffer []byte
@@ -102,35 +107,38 @@ func printFields() {
 	fmt.Println(string(buffer[0:len(buffer) - 1]))
 	}
 
-func printVals(oplog *components.OplogStats) {
-	s := reflect.ValueOf(oplog).Elem()
-
+//func printVals(oplog *components.OplogStats, sizeStats *components.OplogStats) {
+func printVals(allStats *[]interface{}) {
 	var buffer []byte
 
-	for i := 0; i < s.NumField(); i++ {
-		f := s.Field(i)
-		val := f.Interface()
-		switch val.(type) {
-		case int32 :
-			buffer = strconv.AppendInt(buffer, val.(int64), 10)
-		case int64 :
-			buffer = strconv.AppendInt(buffer, val.(int64), 10)
-		case int :
-			buffer = append(buffer, strconv.Itoa(val.(int))...)
-		case float32 :
-			buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 32 )
-		case float64 :
-			buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 64 )
-		case string :
-			buffer = append(buffer, val.(string)...)
-		default :
-			strname := reflect.TypeOf(val).Name()
-			switch strname {
-			case "MongoTimestamp":
-				buffer = strconv.AppendInt(buffer, int64(val.(bson.MongoTimestamp)), 10)
+	for _, stats := range *allStats {
+		s := reflect.ValueOf(stats).Elem()
+
+		for i := 0; i < s.NumField(); i++ {
+			f := s.Field(i)
+			val := f.Interface()
+			switch val.(type) {
+				case int32 :
+				buffer = strconv.AppendInt(buffer, val.(int64), 10)
+				case int64 :
+				buffer = strconv.AppendInt(buffer, val.(int64), 10)
+				case int :
+				buffer = append(buffer, strconv.Itoa(val.(int))...)
+				case float32 :
+				buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 32)
+				case float64 :
+				buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 64)
+				case string :
+				buffer = append(buffer, val.(string)...)
+				default :
+				strname := reflect.TypeOf(val).Name()
+				switch strname {
+				case "MongoTimestamp":
+					buffer = strconv.AppendInt(buffer, int64(val.(bson.MongoTimestamp)), 10)
+				}
 			}
+			buffer = append(buffer, ',')
 		}
-		buffer = append(buffer, ',')
 	}
 	str := string(buffer[0:len(buffer)-1])
 	fmt.Println(str)
