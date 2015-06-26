@@ -87,8 +87,10 @@ func Iterate() {
 		os.Exit(1)
 	}
 
+	sizeStats, err := GetSizeStats(session)
+
 	stats := []interface{}{
-		oplogStats,
+		oplogStats, sizeStats,
 	}
 
 	printVals(&stats)
