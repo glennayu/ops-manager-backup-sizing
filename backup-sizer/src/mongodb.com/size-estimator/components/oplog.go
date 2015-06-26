@@ -222,7 +222,7 @@ func GetOplogStats(session *mgo.Session, timeInterval time.Duration) (*OplogStat
 		oplogInfo.size,
 		gb,
 		cr,
-		cr * gb,
+		gb / cr,
 	}, nil
 }
 
