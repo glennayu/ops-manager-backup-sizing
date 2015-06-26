@@ -17,12 +17,12 @@ type OplogInfo struct {
 }
 
 type OplogStats struct {
-	startTS              bson.MongoTimestamp
-	endTS                bson.MongoTimestamp
-	size                 int
-	gbPerDay			 float64
-	compressionRatio	 float64
-	compressedGbPerDay	 float64
+	StartTS              bson.MongoTimestamp
+	EndTS                bson.MongoTimestamp
+	Size                 int
+	GbPerDay			 float64
+	CompressionRatio	 float64
+	CompressedGbPerDay	 float64
 }
 
 var OplogNotFoundError = errors.New("local.oplog.rs does not seem to exist.")
