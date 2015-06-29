@@ -97,17 +97,24 @@ func Iterate() {
 }
 
 func printFields() {
-	oplog := &OplogStats{}
-	s := reflect.ValueOf(oplog).Elem()
+	allStats := []interface{} {
+		&OplogStats{},
+		&SizeStats{},
+	}
 
 	var buffer []byte
+	for _, stats := range allStats {
 
-	for i := 0; i < s.NumField(); i++ {
-		buffer = append(buffer, s.Type().Field(i).Name ...)
-		buffer = append(buffer, ',')
+		s := reflect.ValueOf(stats).Elem()
+
+
+		for i := 0; i < s.NumField(); i++ {
+			buffer = append(buffer, s.Type().Field(i).Name ...)
+			buffer = append(buffer, ',')
+		}
 	}
 	fmt.Println(string(buffer[0:len(buffer) - 1]))
-	}
+}
 
 func printVals(allStats *[]interface{}) {
 	var buffer []byte
