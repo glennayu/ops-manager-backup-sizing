@@ -20,7 +20,7 @@ func dial(port int) *mgo.Session {
 	addr := "localhost:" + strconv.Itoa(port)
 	session, err := mgo.Dial(addr)
 	if err != nil {
-		panic(fmt.Sprintf("Error dialing. Addr: %v Err: %v", addr, err))
+		panic(fmt.Sprintf("Error dialing. Addr: %v Err: %v/n", addr, err))
 	}
 
 	return session
@@ -43,7 +43,7 @@ func genRandomBytes(cap int32) []byte {
 	b := make([]byte, cap)
 	_, err := rand.Read(b)
 	if err != nil {
-		fmt.Println("error:", err)
+		fmt.Printf("Error generating random bytes: %v\n:", err)
 		return nil
 	}
 	return b
@@ -148,10 +148,10 @@ func TestGetIterator(test *testing.T) {
 
 	var res bson.D
 	if it.Next(res) {
-		test.Error("Empty collection - expected empty iterator")
+		test.Errorf("Empty collection - expected empty iterator")
 	}
 
-	time.Sleep(3*time.Second) //
+	time.Sleep(3*time.Second)
 	timeA := time.Now()
 	insertDocuments(session, dbName, collName, 10)
 	time.Sleep(3*time.Second)

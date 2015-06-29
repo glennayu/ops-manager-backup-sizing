@@ -20,35 +20,36 @@ const (
 )
 
 var (
-	host = flag.String("host", DefaultHostName, "Hostname to ping")
-	port = flag.Int("port", DefaultPort, "Port for the offline agent to ping")
+	host string
+	port int
 	sleepTime time.Duration
 	numIter int
 	uri string
 )
 
 func init() {
+	flag.StringVar(&host, "host", DefaultHostName, "Hostname to ping")
+	flag.IntVar(&port, "port", DefaultPort, "Port for the offline agent to ping")
 	flag.DurationVar(&sleepTime, "interval", DefaultSleepTime, "How long to sleep between iterations")
 	flag.IntVar(&numIter, "iter", DefaultIter, "Number of iterations")
 }
 
 func main() {
 	flag.Parse()
+	uri = fmt.Sprintf("%s:%d", host, port)
 
-	uri := fmt.Sprintf("%s:%d", *host, *port)
-
-	fmt.Printf("Running on port %s every %v for %d iterations.", uri, sleepTime, numIter)
+	fmt.Printf("Running on port %s every %v for %d iterations.\n", uri, sleepTime, numIter)
 
 	session, err := mgo.Dial(uri)
 	if err != nil {
-		fmt.Printf("Failed to dial MongoDB on port %v. Err %v", uri, err)
+		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", uri, err)
 		os.Exit(1)
 	}
 	defer session.Close()
 
 	err = session.Ping();
 	if err != nil {
-		fmt.Printf("Failed to contact server on %s. Err %v", uri, err)
+		fmt.Printf("Failed to contact server on %s. Err %v\n", uri, err)
 		os.Exit(1)
 	}
 
@@ -75,14 +76,14 @@ func RemainingSleepTime(start time.Time) time.Duration {
 func Iterate() {
 	session, err := mgo.Dial(uri)
 	if err != nil {
-		fmt.Printf("Failed to dial MongoDB on port %v. Err %v", uri, err)
+		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", uri, err)
 		return
 	}
 	defer session.Close()
 
 	oplogStats, err := GetOplogStats(session, sleepTime)
 	if err != nil {
-		fmt.Printf("Failed to get oplog stats on server %s. Err: %v", uri, err)
+		fmt.Printf("Failed to get oplog stats on server %s. Err: %v\n", uri, err)
 		os.Exit(1)
 	}
 
@@ -90,7 +91,6 @@ func Iterate() {
 		oplogStats,
 	}
 
-//	printVals(oplogStats)
 	printVals(&stats)
 }
 
@@ -107,7 +107,6 @@ func printFields() {
 	fmt.Println(string(buffer[0:len(buffer) - 1]))
 	}
 
-//func printVals(oplog *components.OplogStats, sizeStats *components.OplogStats) {
 func printVals(allStats *[]interface{}) {
 	var buffer []byte
 

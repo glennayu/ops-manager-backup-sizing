@@ -25,7 +25,7 @@ type OplogStats struct {
 	CompressedGbPerDay	 float64
 }
 
-var OplogNotFoundError = errors.New("local.oplog.rs does not seem to exist.")
+var OplogNotFoundError = errors.New("local.oplog.rs does not seem to exist.\n")
 
 func (info *OplogInfo) GbPerDay() (float64, error) {
 	first := int32(info.startTS >> 32)
@@ -34,7 +34,7 @@ func (info *OplogInfo) GbPerDay() (float64, error) {
 
 	if first > last {
 		return 0,
-		fmt.Errorf("Start timestamp (%f) cannot be later than end timestamp (%f)",
+		fmt.Errorf("Start timestamp (%f) cannot be later than end timestamp (%f)\n",
 			info.startTS, info.endTS)
 	}
 
@@ -206,11 +206,11 @@ func GetOplogStats(session *mgo.Session, timeInterval time.Duration) (*OplogStat
 	}
 
 	iter, err := GetOplogIterator(time.Now(), timeInterval, session)
-	defer iter.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer iter.Close()
+
 	cr, err := CompressionRatio(iter)
 	if err != nil {
 		return nil, err
