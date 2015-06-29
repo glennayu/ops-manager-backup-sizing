@@ -31,7 +31,7 @@ func init() {
 	flag.StringVar(&host, "host", DefaultHostName, "Hostname to ping")
 	flag.IntVar(&port, "port", DefaultPort, "Port for the offline agent to ping")
 	flag.DurationVar(&sleepTime, "interval", DefaultSleepTime, "How long to sleep between iterations")
-	flag.IntVar(&numIter, "iter", DefaultIter, "Number of iterations")
+	flag.IntVar(&numIter, "iterations", DefaultIter, "Number of iterations")
 }
 
 func main() {
