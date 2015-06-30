@@ -7,10 +7,7 @@ import (
 	"math"
 )
 
-const replset_port = 27017
-const standalone_port = 26000
-const dbName = "test"
-const collName = "test"
+
 
 type oplogInfoTest struct {
 	info     *OplogInfo
