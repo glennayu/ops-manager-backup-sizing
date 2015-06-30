@@ -3,6 +3,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"os"
+	"fmt"
 )
 
 type SizeStats struct {
@@ -33,6 +34,7 @@ func getDbPath(session *mgo.Session) (string, error) {
 			dbpath = storage["dbPath"].(string)
 		}
 	}
+
 	return dbpath, err
 }
 
@@ -46,6 +48,10 @@ func getWTFileSize(session *mgo.Session) (float64, error) {
 
 	f, err := os.Open(dbpath)
 	if err != nil {
+		if os.IsPermission(err) {
+			fmt.Printf("Incorrect permissions for file %s", dbpath)
+			return 0, err
+		}
 		return 0, err
 	}
 	list, err := f.Readdir(-1)
@@ -70,7 +76,7 @@ func GetSizeStats(session *mgo.Session) (*SizeStats, error) {
 	}
 
 	dataSize := float64(0)
-	fileSize := float64(0) // check for wt
+	fileSize := float64(0)
 	indexSize := float64(0)
 
 	fs := false
@@ -82,7 +88,8 @@ func GetSizeStats(session *mgo.Session) (*SizeStats, error) {
 		}
 		dataSize += results["dataSize"].(float64)
 		indexSize += results["indexSize"].(float64)
-		if v := results["fileSize"]; v != nil{
+		v := results["fileSize"]
+		if v != nil {
 			fileSize += v.(float64)
 			fs = true
 		}
