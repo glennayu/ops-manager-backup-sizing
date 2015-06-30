@@ -9,6 +9,13 @@ import (
 	"bytes"
 )
 
+const standalone_port = 26000
+const replset_port = 28000
+const wt_port_custPath = 26000
+const wt_root = 26001
+const wt_port_defPath = 26002
+const dbName = "test"
+const collName = "test"
 
 func dial(port int) *mgo.Session {
 	addr := "localhost:" + strconv.Itoa(port)

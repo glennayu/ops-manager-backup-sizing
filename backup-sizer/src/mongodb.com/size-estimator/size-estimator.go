@@ -88,9 +88,14 @@ func Iterate() {
 	}
 
 	sizeStats, err := GetSizeStats(session)
+	if err != nil {
+		fmt.Printf("Failed to get sizing stats on server %s. Err: %v\n", uri, err)
+		os.Exit(1)
+	}
 
 	stats := []interface{}{
-		oplogStats, sizeStats,
+		oplogStats,
+		sizeStats,
 	}
 
 	printVals(&stats)
