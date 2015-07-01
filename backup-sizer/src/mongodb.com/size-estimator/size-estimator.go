@@ -63,7 +63,7 @@ func Run() {
 
 	for iter := 0; iter < numIter; iter++ {
 		start := time.Now()
-		Iterate()
+		Iterate(iter)
 		sleep := RemainingSleepTime(start)
 		time.Sleep(sleep)
 	}
@@ -73,7 +73,7 @@ func RemainingSleepTime(start time.Time) time.Duration {
 	return sleepTime - time.Now().Sub(start)
 }
 
-func Iterate() {
+func Iterate(iter int) {
 	session, err := mgo.Dial(uri)
 	if err != nil {
 		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", uri, err)
@@ -93,9 +93,22 @@ func Iterate() {
 		os.Exit(1)
 	}
 
+	dbpath, err := GetDbPath(session)
+	if err != nil {
+		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", uri, err)
+		os.Exit(1)
+	}
+	blockStats, err := GetBlockHashes(dbpath, "hashes", iter)
+	if err != nil {
+		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
+		os.Exit(1)
+	}
+	fmt.Println(blockStats)
+
 	stats := []interface{}{
 		oplogStats,
 		sizeStats,
+		blockStats,
 	}
 
 	printVals(&stats)
@@ -105,6 +118,7 @@ func printFields() {
 	allStats := []interface{} {
 		&OplogStats{},
 		&SizeStats{},
+		&BlockStats{},
 	}
 
 	var buffer []byte

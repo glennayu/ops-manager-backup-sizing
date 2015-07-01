@@ -8,14 +8,14 @@ import (
 func TestGetDbPath(test *testing.T) {
 	session := dial(wt_port_custPath)
 	defer session.Close()
-	path, err := getDbPath(session)
+	path, err := GetDbPath(session)
 	if err != nil {
 		test.Errorf("Failed to get dbpath on port %i. Err %v", wt_port_custPath, err)
 	}
 
 	sess_defPath := dial(wt_port_defPath)
 	defer sess_defPath.Close()
-	path, err = getDbPath(sess_defPath)
+	path, err = GetDbPath(sess_defPath)
 	if err != nil {
 		test.Errorf("Failed to get dbpath on port %i. Err %v", wt_port_defPath, err)
 	}
