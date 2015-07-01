@@ -12,7 +12,7 @@ type SizeStats struct {
 	FileSize	float64
 }
 
-func getDbPath(session *mgo.Session) (string, error) {
+func GetDbPath(session *mgo.Session) (string, error) {
 	var results (bson.M)
 	session.DB("admin").Run(bson.D{{"getCmdLineOpts",1}}, &results)
 
@@ -71,7 +71,7 @@ func sumDirFiles(dir string, crawlFurther bool) (int64, error) {
 }
 
 func getWTFileSize(session *mgo.Session) (float64, error) {
-	dbpath, err := getDbPath(session)
+	dbpath, err := GetDbPath(session)
 	if err != nil {
 		return 0, err
 	}
