@@ -11,6 +11,7 @@ import (
 
 const standalone_port = 26000
 const replset_port = 28000
+const replset_wt_dirPerDb = 29000
 const wt_port_custPath = 26000
 const wt_root = 26001
 const wt_port_defPath = 26002
@@ -51,7 +52,7 @@ func removeDocuments(mongo *mgo.Session, database string, collection string, num
 const bytesSame = 0
 const bytesRandom = 1
 
-func genRandomBytes(cap int32) []byte {
+func randomBytes(cap int32) []byte {
 	b := make([]byte, cap)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -74,7 +75,7 @@ numBytes uint64, mode int) {
 		case bytesSame:
 			bytesVal = bytes.Repeat([]byte{0}, 5*1024)
 		case bytesRandom:
-			bytesVal = genRandomBytes(5*1024)
+			bytesVal = randomBytes(5*1024)
 		}
 		toAdd := &bson.D{
 			{"_id", bytesGenerated},
@@ -85,3 +86,4 @@ numBytes uint64, mode int) {
 		bytesGenerated += 5 * 1024
 	}
 }
+

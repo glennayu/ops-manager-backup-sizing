@@ -1,7 +1,6 @@
 package components
 import (
 	"testing"
-	"time"
 	"gopkg.in/mgo.v2"
 )
 
@@ -37,11 +36,11 @@ func TestIncorrectPermissions(test *testing.T) {
 
 func testCappedCollection(test *testing.T, port int) {
 	session := dial(port)
+	defer session.Close()
 
+	session.SetSafe(&mgo.Safe{W:1})
 	session.DB(dbName).DropDatabase()
-
 	session.DB(dbName).C("capped").Create(&mgo.CollectionInfo{Capped:true, MaxBytes:4096})
-	time.Sleep(5*time.Second)
 
 	sizes1, err := GetSizeStats(session)
 	if err != nil {
@@ -49,7 +48,6 @@ func testCappedCollection(test *testing.T, port int) {
 	}
 
 	insertDocuments(session, dbName, "capped", 4096)
-	time.Sleep(5*time.Second)
 
 	sizes2, err := GetSizeStats(session)
 	if err != nil {
@@ -65,17 +63,16 @@ func testCappedCollection(test *testing.T, port int) {
 func testSizeStats(test *testing.T, port int) {
 	session := dial(port)
 	defer session.Close()
+	session.SetSafe(&mgo.Safe{W:1})
 
 	session.DB(dbName).DropDatabase()
-	time.Sleep(5*time.Second)
 
 	sizes1, err := GetSizeStats(session)
 	if err != nil {
 		test.Errorf("Failed to get sizes on port %i. Err %v", port, err)
 	}
 
-	insertDocuments(session, dbName, collName, 200)
-	time.Sleep(5*time.Second)
+	insertDocuments(session, dbName, collName, 1000)
 
 	sizes2, err := GetSizeStats(session)
 	if err != nil {
@@ -95,22 +92,28 @@ func testSizeStats(test *testing.T, port int) {
 			sizes1.FileSize, sizes2.FileSize)
 	}
 
-	removeDocuments(session, dbName, collName, 200)
-	time.Sleep(5*time.Second)
+	removeDocuments(session, dbName, collName, 1000)
 
 	sizes3, err := GetSizeStats(session)
 	if err != nil {
 		test.Errorf("Failed to get sizes on port %i. Err %v", port, err)
 	}
-
-	if sizes3.DataSize >= sizes2.DataSize {
-		test.Errorf("Data size did not decrease after removing documents. Before:%f, After:%f",
-			sizes2.DataSize, sizes3.DataSize)
-	}
 	if sizes3.FileSize != sizes2.FileSize {
 		test.Errorf("File size changed after removing documents. Before:%f, After:%f",
 			sizes2.FileSize, sizes3.FileSize)
 	}
+
+	// test multiple databases
+	generateBytes(session, "test2", collName, 5*1024*1024, bytesSame)
+	sizes4, err := GetSizeStats(session)
+	if err != nil {
+		test.Errorf("Failed to get sizes on port %i with multiple databases. Err %v", port, err)
+	}
+	if sizes4.FileSize <= sizes3.FileSize {
+		test.Errorf("File size changed decreased after inserting into new db. Before:%f, After:%f",
+			sizes3.FileSize, sizes4.FileSize)
+	}
+
 }
 
 func TestMmapSizeStats(test *testing.T) {
@@ -119,6 +122,7 @@ func TestMmapSizeStats(test *testing.T) {
 }
 
 func TestWTSizeStats(test *testing.T) {
-	testSizeStats(test, wt_port_custPath)
-	testCappedCollection(test, wt_port_custPath)
+	testSizeStats(test, replset_wt_dirPerDb)
+	testCappedCollection(test, wt_port_defPath)
 }
+
