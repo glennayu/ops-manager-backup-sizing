@@ -7,8 +7,6 @@ import (
 	"math"
 )
 
-
-
 type oplogInfoTest struct {
 	info     *OplogInfo
 	expected float64

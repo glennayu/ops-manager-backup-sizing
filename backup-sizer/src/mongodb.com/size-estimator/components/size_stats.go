@@ -38,18 +38,11 @@ func getDbPath(session *mgo.Session) (string, error) {
 	return dbpath, err
 }
 
-func getWTFileSize(session *mgo.Session) (float64, error) {
-	dbpath, err := getDbPath(session)
-	if err != nil {
-		return 0, err
-	}
-
-	fileSize := int64(0)
-
-	f, err := os.Open(dbpath)
+func sumDirFiles(dir string, crawlFurther bool) (int64, error) {
+	f, err := os.Open(dir)
 	if err != nil {
 		if os.IsPermission(err) {
-			fmt.Printf("Incorrect permissions for file %s", dbpath)
+			fmt.Printf("Incorrect permissions for file %s\n", dir)
 			return 0, err
 		}
 		return 0, err
@@ -60,10 +53,32 @@ func getWTFileSize(session *mgo.Session) (float64, error) {
 		return 0, err
 	}
 
-	for _, dirFile := range list {
-		if dirFile.Name() != "mongod.lock" {
-			fileSize += dirFile.Size()
+	fileSize := int64(0)
+
+	for _, f := range list {
+		if f.IsDir() && crawlFurther {
+			size, err := sumDirFiles(dir +"/" + f.Name(), false)
+			fileSize += size
+			if err != nil {
+				return 0, err
+			}
+		} else if f.Name() != "mongod.lock" {
+			fileSize += f.Size()
 		}
+	}
+
+	return fileSize, nil
+}
+
+func getWTFileSize(session *mgo.Session) (float64, error) {
+	dbpath, err := getDbPath(session)
+	if err != nil {
+		return 0, err
+	}
+
+	fileSize, err := sumDirFiles(dbpath, true)
+	if err != nil {
+		return 0, err
 	}
 
 	return float64(fileSize), nil
