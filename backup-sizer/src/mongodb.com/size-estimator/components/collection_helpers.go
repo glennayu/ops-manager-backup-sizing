@@ -2,6 +2,9 @@ package components
 
 import (
 	"gopkg.in/mgo.v2"
+	"os"
+	"fmt"
+	"path/filepath"
 )
 
 
@@ -25,4 +28,41 @@ func collExists(coll *mgo.Collection) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func getFilesInDir(dir string, crawlFurther bool) ([]string, error) {
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.Open(dir)
+	if err != nil {
+		if os.IsPermission(err) {
+			fmt.Printf("Incorrect permissions for file %s\n", dir)
+		}
+		return nil, err
+	}
+
+	fileInfos, err := f.Readdir(-1)
+	f.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]string, 0)
+
+	for _, fi := range fileInfos {
+		absPath := dir + "/" + fi.Name()
+		if fi.IsDir() && crawlFurther {
+			subDirFiles, err := getFilesInDir(absPath, false)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, subDirFiles...)
+		} else if !fi.IsDir(){
+			files = append(files, absPath)
+		}
+	}
+	return files, nil
 }

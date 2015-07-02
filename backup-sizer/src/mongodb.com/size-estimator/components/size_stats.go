@@ -3,7 +3,6 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"os"
-	"fmt"
 )
 
 type SizeStats struct {
@@ -39,34 +38,18 @@ func GetDbPath(session *mgo.Session) (string, error) {
 }
 
 func sumDirFiles(dir string, crawlFurther bool) (int64, error) {
-	f, err := os.Open(dir)
+	files, err := getFilesInDir(dir, true)
 	if err != nil {
-		if os.IsPermission(err) {
-			fmt.Printf("Incorrect permissions for file %s\n", dir)
+		return 0, err
+	}
+	fileSize := int64(0)
+	for _, fname := range files {
+		fi, err := os.Stat(fname)
+		if err != nil {
 			return 0, err
 		}
-		return 0, err
+		fileSize += fi.Size()
 	}
-	list, err := f.Readdir(-1)
-	f.Close()
-	if err != nil {
-		return 0, err
-	}
-
-	fileSize := int64(0)
-
-	for _, f := range list {
-		if f.IsDir() && crawlFurther {
-			size, err := sumDirFiles(dir +"/" + f.Name(), false)
-			fileSize += size
-			if err != nil {
-				return 0, err
-			}
-		} else if f.Name() != "mongod.lock" {
-			fileSize += f.Size()
-		}
-	}
-
 	return fileSize, nil
 }
 
