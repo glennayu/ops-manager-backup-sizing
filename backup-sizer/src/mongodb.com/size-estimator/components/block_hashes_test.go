@@ -3,6 +3,7 @@ package components
 import (
 	"testing"
 	"math"
+	"fmt"
 )
 
 func TestWritingBlockHashes(test *testing.T) {
@@ -11,6 +12,7 @@ func TestWritingBlockHashes(test *testing.T) {
 	session := dial(standalone_mmap)
 
 	dbpath, err := GetDbPath(session)
+	dbpath = "/Users/gryu/test"
 	if err != nil {
 		test.Fatalf("Could not get dbpath. err:%v", err)
 	}
@@ -24,6 +26,7 @@ func TestWritingBlockHashes(test *testing.T) {
 	if err != nil {
 		test.Errorf("Failed on iteration2. Err:%v", err)
 	}
+
 	if bs.DedupRate != 1 && bs.DedupRate != math.NaN() {
 		test.Errorf("deduprate < 1 on exactly same data. Received: %f", bs.DedupRate)
 	}
