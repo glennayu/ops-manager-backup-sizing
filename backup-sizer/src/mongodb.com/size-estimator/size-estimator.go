@@ -103,7 +103,6 @@ func Iterate(iter int) {
 		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
 		os.Exit(1)
 	}
-	fmt.Println(blockStats)
 
 	stats := []interface{}{
 		oplogStats,
