@@ -17,6 +17,7 @@ const (
 	DefaultHostName = "localhost"
 	DefaultSleepTime = time.Duration(6*time.Hour)
 	DefaultIter = 12
+	DefaultHashDir = "hashes"
 )
 
 var (
@@ -25,6 +26,7 @@ var (
 	sleepTime time.Duration
 	numIter int
 	uri string
+	hashDir string
 )
 
 func init() {
@@ -32,6 +34,7 @@ func init() {
 	flag.IntVar(&port, "port", DefaultPort, "Port for the offline agent to ping")
 	flag.DurationVar(&sleepTime, "interval", DefaultSleepTime, "How long to sleep between iterations")
 	flag.IntVar(&numIter, "iterations", DefaultIter, "Number of iterations")
+	flag.StringVar(&hashDir, "hashDir", DefaultHashDir, "Directory to store block hashes")
 }
 
 func main() {
@@ -99,7 +102,7 @@ func Iterate(iter int) {
 		os.Exit(1)
 	}
 
-	blockStats, err := GetBlockHashes(dbpath, "hashes", iter)
+	blockStats, err := GetBlockHashes(dbpath, hashDir, iter)
 	if err != nil {
 		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
 		os.Exit(1)

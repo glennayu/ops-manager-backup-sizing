@@ -5,20 +5,21 @@ import (
 	"os"
 	"io/ioutil"
 	"path/filepath"
-	"fmt"
 )
+
+const TestDataDir = "../../../../test_data"
+const empty_dir = TestDataDir + "/emptydir"
 
 const emptyHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 const oneBlockHash = "bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a"
 const fiveBlocksHash = "0e5b113b9f40bdd263fc20a75fc39dc112029e4b8c3b645e65856685465e7bd3"
-const subdirHash = "0e5b113b9f40bdd263fc20a75fc39dc112029e4b8c3b645e65856685465e7bd3"
+const fiveBlocksRandomHash = "a6a832668ff60bcf59f467d97d883ed0a67838512ae3b7a6e6bda0dae961f719"
 const partialBlockHash = "a1898b59a192f20e8f0a2a6fec39b171e6df0b19160c49023fca1f63808852b0"
 
 const emptyCompressed = 31
 const fiveBlocksCompressed = 369
 const oneBlockCompressed = 111
 const partialBlockCompressed = 372
-
 
 func TestWritingBlockHashes(test *testing.T) {
 	session := dial(standalone_mmap)
@@ -37,24 +38,11 @@ func TestWritingBlockHashes(test *testing.T) {
 	if err != nil {
 		test.Errorf("Failed on iteration2. Err:%v", err)
 	}
-
-	if bs.DedupRate != 1 {
+	if bs == nil {
+		test.Errorf("Returned nil")
+	} else if bs.DedupRate != 1 {
 		test.Errorf("deduprate < 1 on exactly same data. Received: %f", bs.DedupRate)
 	}
-}
-
-func TestErrorHandling(test *testing.T) {
-	// test error handling
-	rootonlydir := "hashes_root"
-
-	bs, err := GetBlockHashes(rootonlydir, rootonlydir, 3)
-	if bs != nil {
-		test.Errorf("Expected nil block, received %v", bs)
-	}
-	if err == nil {
-		test.Errorf("Expected errors, received none")
-	}
-	fmt.Println(err)
 }
 
 func TestDirPerDB(test *testing.T) {
@@ -168,7 +156,7 @@ func TestHashAndCompressBlocks(test *testing.T) {
 		"empty.test" : emptyHash,
 		"oneblock.test" : oneBlockHash,
 		"fiveblocks.test" : fiveBlocksHash,
-		"subdir.test" : fiveBlocksHash,
+		"fiveblocksrandom.test" : fiveBlocksRandomHash,
 		"partialblock.test": partialBlockHash,
 	}
 
@@ -179,14 +167,15 @@ func TestHashAndCompressBlocks(test *testing.T) {
 //		"partialblock.test": partialBlockCompressed,
 //	}
 
-	fns, err := getFilesInDir(TestDataDir, false)
+	blocks := map[string]Block{}
+
+	fns, err := getFilesInDir(TestDataDir, true)
 	if err != nil {
 		test.Fatalf(err.Error())
 	}
 	for _, fn := range fns {
 		f, err := os.Open(fn)
 		fn := filepath.Base(fn)
-
 		var b []byte
 		b, err = ioutil.ReadAll(f)
 		if err != nil {
@@ -196,47 +185,64 @@ func TestHashAndCompressBlocks(test *testing.T) {
 		if err != nil {
 			test.Errorf(err.Error())
 		}
+		blocks[fn] = block
 
 		h := block.hash
 		if h != hashes[fn] {
 			test.Errorf("Incorrect hash for file %s. Expected:%s Received:%s", fn,  hashes[fn], h)
 		}
-
-//		compressedSize := block.compressedSize
-//		if compressedSize != compressedSizes[fn] {
-//			test.Errorf("Incorrect compressed sizes for file %s. Expected:%d Received:%d",fn, compressedSizes[fn],
-//				compressedSize)
-//		}
-
+	}
+	s1 := blocks["fiveblocks.test"].compressedSize
+	s2 := blocks["fiveblocksrandom.test"].compressedSize
+	if s1 >= s2 {
+		test.Errorf(
+			"Expected compressed size of fiveblocks.test (%d) to be smaller than that of fiveblocksrandom.test (%d)",
+			s1, s2)
 	}
 }
 
 func TestLoadPrevHashes(test *testing.T) {
-	// file doesn't exist
-	const m, k = 10, 2
 	fn := "./DoesNotExist"
-	_, err := loadPrevHashes(fn, m, k)
+	_, err := loadPrevHashes(fn)
 	if err != nil {
 		test.Errorf("Unexpected error from loading non-existant file %s. Error: %v", fn, err)
 	}
 
 	// empty file -- empty bloom filter
 	fn = TestDataDir + "/empy.test"
-	_, err = loadPrevHashes(fn, m, k)
+	_, err = loadPrevHashes(fn)
 	if err != nil {
 		test.Errorf("Unexpected error from loading empty file %s. Error: %v", fn, err)
 	}
 
 	// reading from directory should return an error
 	fn = TestDataDir
-	_, err = loadPrevHashes(fn, m, k)
+	_, err = loadPrevHashes(fn)
 	if err == nil {
 		test.Errorf("Expected error from loading directory %s", fn)
 	}
 
 	fn = TestDataDir + "/empy.test"
-	_, err = loadPrevHashes(fn, m, k)
+	_, err = loadPrevHashes(fn)
 	if err != nil {
 		test.Errorf("Unexpected error from loading file %s. Error: %v", fn, err)
 	}
+}
+
+func TestBloomFilterParams(test *testing.T) {
+	m, k := bloomFilterParams(10, 0.05)
+	if m != 63 || k != 4 {
+		test.Errorf("Expected (m, k) = (63, 4). Received m, k = (%d, %d)", m, k)
+	}
+
+	m, k = bloomFilterParams(0, 0.5)
+	if m != 0 || k != 0 {
+		test.Errorf("Expected (m, k) = (0, 0). Received m, k = (%d, %d)", m, k)
+	}
+
+	m, k = bloomFilterParams(10, 1)
+	if m != 0 || k != 0 {
+		test.Errorf("Expected (m, k) = (0, 0). Received m, k = (%d, %d)", m, k)
+	}
+
 }
