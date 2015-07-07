@@ -14,7 +14,7 @@ const replset_port = 28000
 const replset_wt_dirPerDb = 29000
 const wt_port_custPath = 26100
 const wt_root = 26200
-const wt_port_defPath = 26002
+const wt_port_defPath = 26300
 const dbName = "test"
 const collName = "test"
 
@@ -62,8 +62,7 @@ func randomBytes(cap int32) []byte {
 	return b
 }
 
-func generateBytes(mongo *mgo.Session, database string, collection string,
-numBytes uint64, mode int) {
+func generateBytes(mongo *mgo.Session, database string, collection string, numBytes uint64, mode int) {
 	session := mongo.Copy()
 	defer session.Close()
 

@@ -98,6 +98,7 @@ func Iterate(iter int) {
 		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", uri, err)
 		os.Exit(1)
 	}
+
 	blockStats, err := GetBlockHashes(dbpath, "hashes", iter)
 	if err != nil {
 		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
