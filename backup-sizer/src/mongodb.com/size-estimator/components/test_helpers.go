@@ -24,10 +24,8 @@ func dial(port int) *mgo.Session {
 	if err != nil {
 		panic(fmt.Sprintf("Error dialing. Addr: %v Err: %v", addr, err))
 	}
-
 	return session
 }
-
 
 func insertDocuments(mongo *mgo.Session, database string, collection string, numInsert int) {
 	session := mongo.Clone()
@@ -85,4 +83,6 @@ func generateBytes(mongo *mgo.Session, database string, collection string, numBy
 		bytesGenerated += 5 * 1024
 	}
 }
+
+
 
