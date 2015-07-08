@@ -13,12 +13,12 @@ import (
 	"encoding/hex"
 	"bufio"
 	"math"
+	"io/ioutil"
 )
 
 const kb = 1024
 const blockSizeBytes = 64 * kb
 const hashSize = 65
-const bfErrorRate = 0.01
 
 func readFileNamesToChannel(dir string, errCh chan error) (fnCh chan string) {
 	files, err := getFilesInDir(dir, true)
@@ -103,13 +103,13 @@ func writeHash(h Block, file *os.File) error {
 	return nil
 }
 
-func loadPrevHashes(fileName string) (*bloom.BloomFilter, error) {
-	exists, err := checkExists(fileName)
+func loadPrevHashes(fileName string, falsePosRate float64) (*bloom.BloomFilter, error) {
+	exists, err := CheckExists(fileName)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return bloom.New(0, 0), nil
+		return bloom.New(10, 10), nil
 	}
 
 	n, err := numHashes(fileName)
@@ -117,7 +117,7 @@ func loadPrevHashes(fileName string) (*bloom.BloomFilter, error) {
 		return nil, err
 	}
 
-	m, k := bloomFilterParams(n, bfErrorRate)
+	m, k := bloomFilterParams(n, falsePosRate)
 
 	prevFile, err := os.Open(fileName)
 	if err != nil {
@@ -142,7 +142,7 @@ type BlockStats struct {
 	DataCompressionRatio float64
 }
 
-func checkExists(path string) (bool, error) {
+func CheckExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil
@@ -178,7 +178,7 @@ func bloomFilterParams(n int64, p float64) (m, k uint) {
 	return
 }
 
-func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats, error) {
+func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteration int) (*BlockStats, error) {
 	const numFileSplitters = 3
 	const numBlockHashers = 3
 
@@ -193,7 +193,7 @@ func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats,
 		return nil, err
 	}
 	hashpath += "/"
-	exists, err := checkExists(hashpath)
+	exists, err := CheckExists(hashpath)
 	if err != nil {
 		return nil, err
 	}
@@ -201,9 +201,8 @@ func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats,
 		os.Mkdir(hashpath, 0777)
 	}
 
-
 	prevHashFileName := string(strconv.AppendInt([]byte(hashpath), int64(iteration - 1), 10))
-	bloomFilter, err := loadPrevHashes(prevHashFileName)
+	bloomFilter, err := loadPrevHashes(prevHashFileName, bfFalsePos)
 	if err != nil {
 		return nil, fmt.Errorf("Failed loading previous hashes from %s, iteration %d. Err: %v",
 			string(strconv.AppendInt([]byte(dbpath), int64(iteration - 1), 10)), iteration, err)
@@ -350,5 +349,46 @@ func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats,
 	return &res, nil
 }
 
+
+/*
+For a 5G data file
+	Size hash file 	num hashes 	 err rate 	 m 	 	k 	 size of bloomfilter
+	5324800 	 	81920 	 	0.01 	 	903385 	 7 	 112952
+	5324800 	 	81920 	 	0.01 	 	785200 	 6 	  98176
+	5324800 	 	81920 	 	0.02 	 	667016 	 5 	  83408
+	5324800 	 	81920 	 	0.05 	 	510785 	 4 	  63880
+	5324800 	 	81920 	 	0.10 	 	392600 	 3 	  49104
+*/
+func getBloomFilterSizes(hashfile string) ([]int64, error) {
+	rates := []float64{0.005, 0.01, 0.02, 0.05, 0.1}
+	sizes := make([]int64, len(rates))
+
+	fi, err := os.Stat(hashfile)
+	if err != nil {
+		return nil, err
+	}
+	hashsize := fi.Size()
+
+	fmt.Printf("Size hash file \t num hashes \t err rate \t m \t k \t size of bloomfilter\n")
+	n, err := numHashes(hashfile)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, fp := range rates {
+		m, k := bloomFilterParams(n, fp)
+		bf, err := loadPrevHashes(hashfile, fp)
+		if err != nil {
+			return nil, err
+		}
+		s, err := bf.WriteTo(ioutil.Discard)
+		if err != nil {
+			return nil, err
+		}
+		sizes[i] = s
+		fmt.Printf("%d \t %d \t %.3f \t %d \t %d \t %d\n", hashsize, n, fp, m, k, sizes[i])
+	}
+	return sizes, nil
+}
 
 
