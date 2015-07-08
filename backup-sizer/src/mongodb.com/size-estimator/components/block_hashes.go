@@ -23,7 +23,6 @@ const bfErrorRate = 0.01
 func readFileNamesToChannel(dir string, errCh chan error) (fnCh chan string) {
 	files, err := getFilesInDir(dir, true)
 	if err != nil {
-		fmt.Println(err)
 		errCh <- err
 		fnCh = make(chan string)
 		close(fnCh)
@@ -45,24 +44,24 @@ type Block struct {
 	uncompressedSize int
 }
 
-func splitFiles(fname string) ([][]byte, error) {
-	blocks := make([][]byte, 0)
+func splitFiles(fname string) (func() ([]byte, error), error) {
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
 	}
-	for {
+	fun := func() ([]byte, error) {
 		b := make([]byte, blockSizeBytes)
 		_, err := f.Read(b)
 		if err != nil {
 			if err == io.EOF {
-				break
+				f.Close()
+				return nil, nil
 			}
+			return nil, err
 		}
-		blocks = append(blocks, b)
+		return b, nil
 	}
-	f.Close()
-	return blocks, nil
+	return fun, nil
 }
 
 func hashAndCompressBlocks(b []byte) (Block, error) {
@@ -154,6 +153,7 @@ func checkExists(path string) (bool, error) {
 	return true, err
 }
 
+// fn stores hashes from previous iteration
 func numHashes(fn string) (int64, error) {
 	fi, err := os.Stat(fn)
 	if err != nil {
@@ -164,6 +164,7 @@ func numHashes(fn string) (int64, error) {
 }
 
 // n is the size of the set, p is the false positive rate
+// calculated as explained in http://www.cs.utexas.edu/users/lam/386p/slides/Bloom%20Filters.pdf
 func bloomFilterParams(n int64, p float64) (m, k uint) {
 	c := 0.6185 // 0.5 ^ (m/n * ln 2) ~= 0.6185 ^ (m/n)
 	nf := float64(n)
@@ -221,7 +222,7 @@ func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats,
 
 	go func() {
 		const maxErrors = 5
-		errors := []byte("Errors:\n")
+		errors := make([]byte, 0)
 		numErrors := 0
 
 		for {
@@ -235,15 +236,13 @@ func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats,
 				errors = append(errors, []byte(s) ...)
 			}
 		}
-		if numErrors > maxErrors {
-			s := fmt.Sprintf("Total %d errors; not printing rest\n", numErrors)
-			errors = append(errors, []byte(s) ...)
-		}
+		s := fmt.Sprintf("Encountered %d errors. Printing first %d.\n", numErrors, maxErrors)
+		errors = append([]byte(s), errors ... )
+
 		if numErrors > 0 {
 			finalErr <- fmt.Errorf(string(errors))
 		}
 		close(finalErr)
-		return
 	}()
 
 	// load up all the filenames into fnCh
@@ -265,12 +264,19 @@ func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats,
 				if fname == "" {
 					break
 				}
-
 				blocks, err := splitFiles(fname)
 				if err != nil {
 					errCh <- err
+					break
 				}
-				for _, block := range blocks {
+				for {
+					block, err := blocks()
+					if block == nil {
+						if err != nil {
+							errCh <- err
+						}
+						break
+					}
 					blocksCh <- block
 				}
 			}
@@ -334,14 +340,13 @@ func GetBlockHashes(dbpath string, hashpath string, iteration int) (*BlockStats,
 	hashWG.Wait()
 	close(hashCh)
 
+	res := <-crResChan
 	close(errCh)
-
 
 	err = <-finalErr
 	if err != nil {
 		return nil, err
 	}
-	res := <-crResChan
 	return &res, nil
 }
 
