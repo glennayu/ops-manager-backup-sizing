@@ -109,8 +109,8 @@ func testSizeStats(test *testing.T, port int) {
 	if err != nil {
 		test.Errorf("Failed to get sizes on port %i with multiple databases. Err %v", port, err)
 	}
-	if sizes4.FileSize <= sizes3.FileSize {
-		test.Errorf("File size changed decreased after inserting into new db. Before:%f, After:%f",
+	if sizes4.FileSize < sizes3.FileSize {
+		test.Errorf("File size decreased after inserting into new db. Before:%f, After:%f",
 			sizes3.FileSize, sizes4.FileSize)
 	}
 

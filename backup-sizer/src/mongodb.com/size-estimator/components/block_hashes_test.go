@@ -12,7 +12,6 @@ const empty_dir = TestDataDir + "/emptydir"
 
 const emptyHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 const oneBlockHash = "bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a"
-const fiveBlocksHash = "0e5b113b9f40bdd263fc20a75fc39dc112029e4b8c3b645e65856685465e7bd3"
 const fiveBlocksRandomHash = "a6a832668ff60bcf59f467d97d883ed0a67838512ae3b7a6e6bda0dae961f719"
 const partialBlockHash = "a1898b59a192f20e8f0a2a6fec39b171e6df0b19160c49023fca1f63808852b0"
 
@@ -22,7 +21,7 @@ const oneBlockCompressed = 111
 const partialBlockCompressed = 372
 
 func TestWritingBlockHashes(test *testing.T) {
-	session := dial(standalone_mmap)
+	session := dial(wt_port_defPath)
 
 	dbpath, err := GetDbPath(session)
 	if err != nil {
@@ -33,6 +32,9 @@ func TestWritingBlockHashes(test *testing.T) {
 	if err != nil {
 		test.Errorf("failed. Err: %v", err)
 	}
+	if bs == nil {
+		test.Errorf("Returned nil")
+	}
 
 	bs, err = GetBlockHashes(dbpath, "hashes", 1)
 	if err != nil {
@@ -40,8 +42,6 @@ func TestWritingBlockHashes(test *testing.T) {
 	}
 	if bs == nil {
 		test.Errorf("Returned nil")
-	} else if bs.DedupRate != 1 {
-		test.Errorf("deduprate < 1 on exactly same data. Received: %f", bs.DedupRate)
 	}
 }
 
@@ -57,14 +57,16 @@ func TestDirPerDB(test *testing.T) {
 	if err != nil {
 		test.Errorf("failed. Err: %v", err)
 	}
+	if bs == nil {
+		test.Errorf("Returned nil")
+	}
 
 	bs, err = GetBlockHashes(dbpath, "hashes", 1)
 	if err != nil {
 		test.Errorf("Failed on iteration2. Err:%v", err)
 	}
-
-	if bs.DedupRate != 1 {
-		test.Errorf("deduprate < 1 on exactly same data. Received: %f", bs.DedupRate)
+	if bs == nil {
+		test.Errorf("Returned nil")
 	}
 }
 
@@ -119,8 +121,8 @@ func TestReadFileNames(test *testing.T) {
 			fncount++
 		}
 	}
-	if fncount != 5 {
-		test.Errorf("Expected five filenames from directory %s. Received: %d", TestDataDir, fncount)
+	if fncount != 4 {
+		test.Errorf("Expected four filenames from directory %s. Received: %d", TestDataDir, fncount)
 	}
 
 }
@@ -129,7 +131,6 @@ func TestSplitBlocks(test *testing.T) {
 	numBlocks := map[string]int {
 		"empty.test" : 0,
 		"oneblock.test" : 1,
-		"fiveblocks.test" : 5,
 		"subdir.test" : 5,
 		"partialblock.test": 6,
 	}
@@ -143,19 +144,29 @@ func TestSplitBlocks(test *testing.T) {
 			test.Errorf("Failed to split file %s into blocks. Error: %v", fn, err)
 		}
 		fn = filepath.Base(fn)
-		if len(blocks) != numBlocks[fn] {
+
+		fileNumBlocks := 0
+		for {
+			block, err := blocks()
+			if block == nil {
+				if err != nil {
+					test.Errorf("Failed to get block from splitFiles for file %s. Error: %v", fn, err)
+				}
+				break
+			}
+			fileNumBlocks++
+		}
+		if fileNumBlocks != numBlocks[fn] {
 			test.Errorf("Unexpected number of blocks for file %s. Expected: %d, Received:%d", fn, numBlocks[fn],
-				len(blocks))
+				fileNumBlocks)
 		}
 	}
-
 }
 
 func TestHashAndCompressBlocks(test *testing.T) {
 	hashes := map[string]string{
 		"empty.test" : emptyHash,
 		"oneblock.test" : oneBlockHash,
-		"fiveblocks.test" : fiveBlocksHash,
 		"fiveblocksrandom.test" : fiveBlocksRandomHash,
 		"partialblock.test": partialBlockHash,
 	}
@@ -163,7 +174,6 @@ func TestHashAndCompressBlocks(test *testing.T) {
 //	compressedSizes := map[string]int{
 //		"empty.test" : emptyCompressed,
 //		"oneblock.test" : oneBlockCompressed,
-//		"fiveblocks.test" : fiveBlocksCompressed,
 //		"partialblock.test": partialBlockCompressed,
 //	}
 
@@ -191,13 +201,6 @@ func TestHashAndCompressBlocks(test *testing.T) {
 		if h != hashes[fn] {
 			test.Errorf("Incorrect hash for file %s. Expected:%s Received:%s", fn,  hashes[fn], h)
 		}
-	}
-	s1 := blocks["fiveblocks.test"].compressedSize
-	s2 := blocks["fiveblocksrandom.test"].compressedSize
-	if s1 >= s2 {
-		test.Errorf(
-			"Expected compressed size of fiveblocks.test (%d) to be smaller than that of fiveblocksrandom.test (%d)",
-			s1, s2)
 	}
 }
 
