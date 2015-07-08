@@ -28,7 +28,9 @@ func TestWritingBlockHashes(test *testing.T) {
 		test.Fatalf("Could not get dbpath. err:%v", err)
 	}
 
-	bs, err := GetBlockHashes(dbpath, "hashes", 0)
+	falsePosRate := 0.01
+
+	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, 0)
 	if err != nil {
 		test.Errorf("failed. Err: %v", err)
 	}
@@ -36,7 +38,7 @@ func TestWritingBlockHashes(test *testing.T) {
 		test.Errorf("Returned nil")
 	}
 
-	bs, err = GetBlockHashes(dbpath, "hashes", 1)
+	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate, 1)
 	if err != nil {
 		test.Errorf("Failed on iteration2. Err:%v", err)
 	}
@@ -53,7 +55,8 @@ func TestDirPerDB(test *testing.T) {
 		test.Fatalf("Could not get dbpath. err:%v", err)
 	}
 
-	bs, err := GetBlockHashes(dbpath, "hashes", 0)
+	falsePosRate := 0.1
+	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, 0)
 	if err != nil {
 		test.Errorf("failed. Err: %v", err)
 	}
@@ -61,7 +64,7 @@ func TestDirPerDB(test *testing.T) {
 		test.Errorf("Returned nil")
 	}
 
-	bs, err = GetBlockHashes(dbpath, "hashes", 1)
+	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate, 1)
 	if err != nil {
 		test.Errorf("Failed on iteration2. Err:%v", err)
 	}
@@ -74,7 +77,7 @@ func TestReadFileNames(test *testing.T) {
 	// empty directory
 	errCh := make(chan error)
 
-	exists, err := checkExists(empty_dir)
+	exists, err := CheckExists(empty_dir)
 	if err != nil {
 		test.Fatalf("Failure to check %s exists", empty_dir)
 	}
@@ -204,34 +207,6 @@ func TestHashAndCompressBlocks(test *testing.T) {
 	}
 }
 
-func TestLoadPrevHashes(test *testing.T) {
-	fn := "./DoesNotExist"
-	_, err := loadPrevHashes(fn)
-	if err != nil {
-		test.Errorf("Unexpected error from loading non-existant file %s. Error: %v", fn, err)
-	}
-
-	// empty file -- empty bloom filter
-	fn = TestDataDir + "/empy.test"
-	_, err = loadPrevHashes(fn)
-	if err != nil {
-		test.Errorf("Unexpected error from loading empty file %s. Error: %v", fn, err)
-	}
-
-	// reading from directory should return an error
-	fn = TestDataDir
-	_, err = loadPrevHashes(fn)
-	if err == nil {
-		test.Errorf("Expected error from loading directory %s", fn)
-	}
-
-	fn = TestDataDir + "/empy.test"
-	_, err = loadPrevHashes(fn)
-	if err != nil {
-		test.Errorf("Unexpected error from loading file %s. Error: %v", fn, err)
-	}
-}
-
 func TestBloomFilterParams(test *testing.T) {
 	m, k := bloomFilterParams(10, 0.05)
 	if m != 63 || k != 4 {
@@ -247,5 +222,36 @@ func TestBloomFilterParams(test *testing.T) {
 	if m != 0 || k != 0 {
 		test.Errorf("Expected (m, k) = (0, 0). Received m, k = (%d, %d)", m, k)
 	}
+}
+
+func TestLoadPrevHashes(test *testing.T) {
+	fn := "./DoesNotExist"
+	falsePosRate := 0.01
+	_, err := loadPrevHashes(fn, falsePosRate)
+	if err != nil {
+		test.Errorf("Unexpected error from loading non-existant file %s. Error: %v", fn, err)
+	}
+
+	// empty file -- empty bloom filter
+	fn = TestDataDir + "/empy.test"
+	_, err = loadPrevHashes(fn, falsePosRate)
+	if err != nil {
+		test.Errorf("Unexpected error from loading empty file %s. Error: %v", fn, err)
+	}
+
+	// reading from directory should return an error
+	fn = TestDataDir
+	_, err = loadPrevHashes(fn, falsePosRate)
+	if err == nil {
+		test.Errorf("Expected error from loading directory %s", fn)
+	}
+
+	fn = TestDataDir + "/empy.test"
+	_, err = loadPrevHashes(fn, falsePosRate)
+	if err != nil {
+		test.Errorf("Unexpected error from loading file %s. Error: %v", fn, err)
+	}
 
 }
+
+

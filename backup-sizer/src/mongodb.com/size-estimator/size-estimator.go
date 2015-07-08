@@ -18,6 +18,7 @@ const (
 	DefaultSleepTime = time.Duration(6*time.Hour)
 	DefaultIter = 12
 	DefaultHashDir = "hashes"
+	DefaultFalsePosRate = 0.01
 )
 
 var (
@@ -27,6 +28,8 @@ var (
 	numIter int
 	uri string
 	hashDir string
+	falsePosRate float64
+
 )
 
 func init() {
@@ -35,6 +38,7 @@ func init() {
 	flag.DurationVar(&sleepTime, "interval", DefaultSleepTime, "How long to sleep between iterations")
 	flag.IntVar(&numIter, "iterations", DefaultIter, "Number of iterations")
 	flag.StringVar(&hashDir, "hashDir", DefaultHashDir, "Directory to store block hashes")
+	flag.Float64Var(&falsePosRate, "falsePos", DefaultFalsePosRate, "False positive rate for duplicated hashes")
 }
 
 func main() {
@@ -58,6 +62,17 @@ func main() {
 
 	fmt.Printf("Successfully connected to %s\n", uri);
 
+	exists, err := CheckExists(hashDir)
+	if err != nil {
+		fmt.Printf("Failure checking directory %s exists. Err %v\n", hashDir, err)
+		os.Exit(1)
+	}
+	if exists {
+		err := os.RemoveAll(hashDir)
+		if err != nil {
+			fmt.Printf("Failure removing directory %s. Err %v\n", hashDir, err)
+		}
+	}
 	Run()
 }
 
@@ -102,7 +117,7 @@ func Iterate(iter int) {
 		os.Exit(1)
 	}
 
-	blockStats, err := GetBlockHashes(dbpath, hashDir, iter)
+	blockStats, err := GetBlockHashes(dbpath, hashDir, falsePosRate, iter)
 	if err != nil {
 		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
 		os.Exit(1)
