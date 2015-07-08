@@ -13,6 +13,8 @@ import (
 )
 
 const (
+ 	kb = 1024
+	mb = 1024 * kb
 	DefaultPort = 27017
 	DefaultHostName = "localhost"
 	DefaultSleepTime = time.Duration(6*time.Hour)
@@ -126,7 +128,19 @@ func Iterate(iter int) {
 	stats := []interface{}{
 		oplogStats,
 		sizeStats,
-		blockStats,
+	}
+
+
+	blocksizes := []int{64 * kb, 16 * mb}
+
+	for _, blocksize := range blocksizes {
+		hashpath := hashDir + "/" + strconv.Itoa(blocksize)
+		blockStats, err := GetBlockHashes(dbpath, hashpath, iter, blocksize)
+		if err != nil {
+			fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
+			os.Exit(1)
+		}
+		stats = append(stats, blockStats)
 	}
 
 	printVals(&stats)
@@ -136,14 +150,14 @@ func printFields() {
 	allStats := []interface{} {
 		&OplogStats{},
 		&SizeStats{},
-		&BlockStats{},
+		&BlockStats{BlockSize:64*kb},
+		&BlockStats{BlockSize:16*mb},
 	}
 
 	var buffer []byte
 	for _, stats := range allStats {
 
 		s := reflect.ValueOf(stats).Elem()
-
 
 		for i := 0; i < s.NumField(); i++ {
 			buffer = append(buffer, s.Type().Field(i).Name ...)
