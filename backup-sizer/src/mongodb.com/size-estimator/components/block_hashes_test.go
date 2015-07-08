@@ -20,6 +20,19 @@ const fiveBlocksCompressed = 369
 const oneBlockCompressed = 111
 const partialBlockCompressed = 372
 
+const kb = 1024
+const mb = 1024*kb
+
+var blocksizes = []int{64 * kb,
+128 * kb,
+256 * kb,
+512 * kb,
+1 * mb,
+2 * mb,
+4 * mb,
+8 * mb,
+16 * mb}
+
 func TestWritingBlockHashes(test *testing.T) {
 	session := dial(wt_port_defPath)
 
@@ -30,7 +43,7 @@ func TestWritingBlockHashes(test *testing.T) {
 
 	falsePosRate := 0.01
 
-	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, 0)
+	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, blocksizes, 0)
 	if err != nil {
 		test.Errorf("failed. Err: %v", err)
 	}
@@ -38,7 +51,7 @@ func TestWritingBlockHashes(test *testing.T) {
 		test.Errorf("Returned nil")
 	}
 
-	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate, 1)
+	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate, blocksizes, 1)
 	if err != nil {
 		test.Errorf("Failed on iteration2. Err:%v", err)
 	}
@@ -56,7 +69,7 @@ func TestDirPerDB(test *testing.T) {
 	}
 
 	falsePosRate := 0.1
-	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, 0)
+	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, blocksizes,  0)
 	if err != nil {
 		test.Errorf("failed. Err: %v", err)
 	}
@@ -64,7 +77,7 @@ func TestDirPerDB(test *testing.T) {
 		test.Errorf("Returned nil")
 	}
 
-	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate, 1)
+	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate, blocksizes, 1)
 	if err != nil {
 		test.Errorf("Failed on iteration2. Err:%v", err)
 	}
@@ -142,7 +155,7 @@ func TestSplitBlocks(test *testing.T) {
 		test.Fatalf(err.Error())
 	}
 	for _, fn := range fns {
-		blocks, err := splitFiles(fn)
+		blocks, err := splitFiles(fn, blockSizeBytes)
 		if err != nil {
 			test.Errorf("Failed to split file %s into blocks. Error: %v", fn, err)
 		}
