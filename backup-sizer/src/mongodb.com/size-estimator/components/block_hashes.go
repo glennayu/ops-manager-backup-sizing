@@ -44,7 +44,7 @@ type Block struct {
 	uncompressedSize int
 }
 
-func splitFiles(fname string) (func() ([]byte, error), error) {
+func splitFiles(fname string, blockSizeBytes int) ([][]byte, error) {
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -138,6 +138,7 @@ func loadPrevHashes(fileName string, falsePosRate float64) (*bloom.BloomFilter, 
 }
 
 type BlockStats struct {
+	BlockSize			 int
 	DedupRate            float64
 	DataCompressionRatio float64
 }
@@ -178,7 +179,8 @@ func bloomFilterParams(n int64, p float64) (m, k uint) {
 	return
 }
 
-func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteration int) (*BlockStats, error) {
+func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteration int, blocksize int) (*BlockStats,
+error) {
 	const numFileSplitters = 3
 	const numBlockHashers = 3
 
@@ -198,14 +200,10 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 		return nil, err
 	}
 	if !exists {
-		os.Mkdir(hashpath, 0777)
-	}
-
-	prevHashFileName := string(strconv.AppendInt([]byte(hashpath), int64(iteration - 1), 10))
-	bloomFilter, err := loadPrevHashes(prevHashFileName, bfFalsePos)
-	if err != nil {
-		return nil, fmt.Errorf("Failed loading previous hashes from %s, iteration %d. Err: %v",
-			string(strconv.AppendInt([]byte(dbpath), int64(iteration - 1), 10)), iteration, err)
+		err = os.MkdirAll(hashpath, 0777)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	hashFileName := strconv.AppendInt([]byte(hashpath), int64(iteration), 10)
@@ -214,6 +212,14 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 		return nil, fmt.Errorf("Failed creating file %s to write hashes, iteration %d. Err: %v",
 			string(hashFileName), iteration, err)
 	}
+
+	prevHashFileName := string(strconv.AppendInt([]byte(hashpath), int64(iteration - 1), 10))
+	bloomFilter, err := loadPrevHashes(prevHashFileName, bfFalsePos)
+	if err != nil {
+		return nil, fmt.Errorf("Failed loading previous hashes from %s, iteration %d. Err: %v",
+		string(strconv.AppendInt([]byte(dbpath), int64(iteration - 1), 10)), iteration, err)
+	}
+
 
 	errCh := make(chan error)
 
@@ -263,7 +269,8 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 				if fname == "" {
 					break
 				}
-				blocks, err := splitFiles(fname)
+
+				blocks, err := splitFiles(fname, blocksize)
 				if err != nil {
 					errCh <- err
 					break
@@ -307,7 +314,6 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 		uncompressedTotal := 0
 		totalHashes := 0
 		totalDupeCount := 0
-
 		for {
 			h, open := <-hashCh
 			if !open {
@@ -316,12 +322,10 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 			totalHashes++
 			compressedTotal += h.compressedSize
 			uncompressedTotal += h.uncompressedSize
-
 			err := writeHash(h, hashFile)
 			if err != nil {
 				errCh <- err
 			}
-
 			if bloomFilter.TestString(h.hash) {
 				totalDupeCount++
 			}
@@ -329,7 +333,7 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 
 		cr := float64(uncompressedTotal) / float64(compressedTotal)
 		dedupRate := float64(totalDupeCount) / float64(totalHashes)
-		crResChan <- BlockStats{dedupRate, cr}
+		crResChan <- BlockStats{blocksize, dedupRate, cr}
 		return
 	}()
 
@@ -348,7 +352,6 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 	}
 	return &res, nil
 }
-
 
 /*
 For a 5G data file
@@ -390,5 +393,3 @@ func getBloomFilterSizes(hashfile string) ([]int64, error) {
 	}
 	return sizes, nil
 }
-
-
