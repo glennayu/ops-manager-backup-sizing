@@ -10,10 +10,11 @@ import (
 	"reflect"
 	"strconv"
 	"gopkg.in/mgo.v2/bson"
+	"sync"
 )
 
 const (
- 	kb = 1024
+	kb = 1024
 	mb = 1024 * kb
 	DefaultPort = 27017
 	DefaultHostName = "localhost"
@@ -31,8 +32,17 @@ var (
 	uri string
 	hashDir string
 	falsePosRate float64
-
+	blocksizes = []int{64 * kb,
+		128 * kb,
+		256 * kb,
+		512 * kb,
+		1 * mb,
+		2 * mb,
+		4 * mb,
+		8 * mb,
+		15 * mb}
 )
+
 
 func init() {
 	flag.StringVar(&host, "host", DefaultHostName, "Hostname to ping")
@@ -118,29 +128,31 @@ func Iterate(iter int) {
 		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", uri, err)
 		os.Exit(1)
 	}
-
-	blockStats, err := GetBlockHashes(dbpath, hashDir, falsePosRate, iter)
-	if err != nil {
-		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
-		os.Exit(1)
-	}
-
+	
 	stats := []interface{}{
-		oplogStats,
-		sizeStats,
+	oplogStats,
+	sizeStats,
 	}
 
+	sizeToStats := make(map[int]*BlockStats)
 
-	blocksizes := []int{64 * kb, 16 * mb}
-
+	var blockStatsWG sync.WaitGroup
 	for _, blocksize := range blocksizes {
-		hashpath := hashDir + "/" + strconv.Itoa(blocksize)
-		blockStats, err := GetBlockHashes(dbpath, hashpath, iter, blocksize)
-		if err != nil {
-			fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
-			os.Exit(1)
-		}
-		stats = append(stats, blockStats)
+		blockStatsWG.Add(1)
+//		go func() {
+			hashpath := hashDir + "/" + strconv.Itoa(blocksize)
+			blockStats, err := GetBlockHashes(dbpath, hashpath, iter, blocksize)
+			if err != nil {
+				fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
+				os.Exit(1)
+			}
+			sizeToStats[blocksize] = blockStats
+			blockStatsWG.Done()
+//		} ()
+	}
+	blockStatsWG.Wait()
+	for _, blocksize := range blocksizes {
+		stats = append(stats, sizeToStats[blocksize])
 	}
 
 	printVals(&stats)
@@ -150,9 +162,11 @@ func printFields() {
 	allStats := []interface{} {
 		&OplogStats{},
 		&SizeStats{},
-		&BlockStats{BlockSize:64*kb},
-		&BlockStats{BlockSize:16*mb},
 	}
+	for _, size := range blocksizes {
+		allStats = append(allStats, &BlockStats{BlockSize:size})
+	}
+
 
 	var buffer []byte
 	for _, stats := range allStats {
