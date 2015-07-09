@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"strconv"
 	"gopkg.in/mgo.v2/bson"
-	"sync"
 )
 
 const (
@@ -40,7 +39,8 @@ var (
 		2 * mb,
 		4 * mb,
 		8 * mb,
-		15 * mb}
+		16 * mb,
+	}
 )
 
 
@@ -89,7 +89,7 @@ func main() {
 }
 
 func Run() {
-	printFields()
+		printFields()
 
 	for iter := 0; iter < numIter; iter++ {
 		start := time.Now()
@@ -128,45 +128,28 @@ func Iterate(iter int) {
 		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", uri, err)
 		os.Exit(1)
 	}
-	
+
+
+	blockStats, err := GetBlockHashes(dbpath, hashDir, falsePosRate, iter, blocksizes)
+	if err != nil {
+		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
+		os.Exit(1)
+	}
 	stats := []interface{}{
-	oplogStats,
-	sizeStats,
-	}
-
-	sizeToStats := make(map[int]*BlockStats)
-
-	var blockStatsWG sync.WaitGroup
-	for _, blocksize := range blocksizes {
-		blockStatsWG.Add(1)
-//		go func() {
-			hashpath := hashDir + "/" + strconv.Itoa(blocksize)
-			blockStats, err := GetBlockHashes(dbpath, hashpath, iter, blocksize)
-			if err != nil {
-				fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
-				os.Exit(1)
-			}
-			sizeToStats[blocksize] = blockStats
-			blockStatsWG.Done()
-//		} ()
-	}
-	blockStatsWG.Wait()
-	for _, blocksize := range blocksizes {
-		stats = append(stats, sizeToStats[blocksize])
+		oplogStats,
+		sizeStats,
+		blockStats,
 	}
 
 	printVals(&stats)
 }
 
+// todo ok this needs to be fixed but ibunno how welpedy halp
 func printFields() {
 	allStats := []interface{} {
 		&OplogStats{},
 		&SizeStats{},
 	}
-	for _, size := range blocksizes {
-		allStats = append(allStats, &BlockStats{BlockSize:size})
-	}
-
 
 	var buffer []byte
 	for _, stats := range allStats {
@@ -178,41 +161,86 @@ func printFields() {
 			buffer = append(buffer, ',')
 		}
 	}
+
+	// this is just going to have to be hardcoded for now.
+	for _, bs := range blocksizes {
+		s := fmt.Sprintf("DedupRate(%d),DataCompressionRate(%d),", bs, bs)
+		buffer = append(buffer, s...)
+	}
+
 	fmt.Println(string(buffer[0:len(buffer) - 1]))
+}
+
+func toString(val interface{}) []byte {
+	var s string
+	switch val.(type) {
+		case int32, int64 :
+		s = strconv.FormatInt(val.(int64), 10)
+		case int :
+		s = strconv.Itoa(val.(int))
+		case float32 :
+		s = strconv.FormatFloat(val.(float64), 'f', 3, 32)
+		case float64 :
+		s = strconv.FormatFloat(val.(float64), 'f', 3, 64)
+		case string :
+		s = val.(string)
+		default :
+		strname := reflect.TypeOf(val).Name()
+		switch strname {
+		case "MongoTimestamp":
+			s = strconv.FormatInt(int64(val.(bson.MongoTimestamp)), 10)
+		}
+	}
+	return []byte(s)
 }
 
 func printVals(allStats *[]interface{}) {
 	var buffer []byte
 
 	for _, stats := range *allStats {
-		s := reflect.ValueOf(stats).Elem()
+		v := reflect.ValueOf(stats)
+		s := v.Elem()
+		fmt.Println(v, s, s.Kind(), s.Type().Name())
 
-		for i := 0; i < s.NumField(); i++ {
-			f := s.Field(i)
-			val := f.Interface()
-			switch val.(type) {
-				case int32 :
-				buffer = strconv.AppendInt(buffer, val.(int64), 10)
-				case int64 :
-				buffer = strconv.AppendInt(buffer, val.(int64), 10)
-				case int :
-				buffer = append(buffer, strconv.Itoa(val.(int))...)
-				case float32 :
-				buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 32)
-				case float64 :
-				buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 64)
-				case string :
-				buffer = append(buffer, val.(string)...)
-				default :
-				strname := reflect.TypeOf(val).Name()
-				switch strname {
-				case "MongoTimestamp":
-					buffer = strconv.AppendInt(buffer, int64(val.(bson.MongoTimestamp)), 10)
-				}
+		if s.Kind() == reflect.Map {
+			blockStatsMapPtr := stats.(*AllBlockSizeStats)
+			for size, blockstat := range *blockStatsMapPtr {
+				buffer = append(buffer, strconv.Itoa(size) ...)
+				buffer = append(buffer, "," ...)
+				buffer = append(buffer, toString(blockstat.DedupRate) ...)
+				buffer = append(buffer, "," ...)
+				buffer = append(buffer, toString(blockstat.DataCompressionRatio)...)
 			}
-			buffer = append(buffer, ',')
+		} else {
+			for i := 0; i < s.NumField(); i++ {
+				f := s.Field(i)
+				val := f.Interface()
+				buffer = append(buffer, toString(val)...)
+//				switch val.(type) {
+//					case int32 :
+//					buffer = strconv.AppendInt(buffer, val.(int64), 10)
+//					case int64 :
+//					buffer = strconv.AppendInt(buffer, val.(int64), 10)
+//					case int :
+//					buffer = append(buffer, strconv.Itoa(val.(int))...)
+//					case float32 :
+//					buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 32)
+//					case float64 :
+//					buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 64)
+//					case string :
+//					buffer = append(buffer, val.(string)...)
+//					default :
+//					strname := reflect.TypeOf(val).Name()
+//					switch strname {
+//					case "MongoTimestamp":
+//						buffer = strconv.AppendInt(buffer, int64(val.(bson.MongoTimestamp)), 10)
+//					}
+//				}
+				buffer = append(buffer, ',')
+			}
 		}
 	}
 	str := string(buffer[0:len(buffer)-1])
 	fmt.Println(str)
+	return
 }
