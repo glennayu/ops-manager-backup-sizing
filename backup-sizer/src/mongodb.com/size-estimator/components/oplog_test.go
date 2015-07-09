@@ -200,13 +200,13 @@ func TestCompressionRatio(test *testing.T) {
 
 func TestGetOplogInfo(test *testing.T) {
 	// oplog doesn't exist
-	sessionSingle := dial(standalone_port)
+	sessionSingle := dial(standalone_mmap)
 	defer sessionSingle.Close()
 
 	info, err := GetOplogInfo(sessionSingle)
 	if err == nil {
 		test.Errorf("Expected error for nonexistent oplog. Result: %d",
-		info)
+			info)
 	}
 
 	session := dial(replset_port)
