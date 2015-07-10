@@ -200,16 +200,15 @@ func printVals(allStats *[]interface{}) {
 	for _, stats := range *allStats {
 		v := reflect.ValueOf(stats)
 		s := v.Elem()
-		fmt.Println(v, s, s.Kind(), s.Type().Name())
 
 		if s.Kind() == reflect.Map {
 			blockStatsMapPtr := stats.(*AllBlockSizeStats)
-			for size, blockstat := range *blockStatsMapPtr {
-				buffer = append(buffer, strconv.Itoa(size) ...)
-				buffer = append(buffer, "," ...)
+			for _, size := range blocksizes {
+				blockstat := (*blockStatsMapPtr)[size]
 				buffer = append(buffer, toString(blockstat.DedupRate) ...)
 				buffer = append(buffer, "," ...)
 				buffer = append(buffer, toString(blockstat.DataCompressionRatio)...)
+				buffer = append(buffer, "," ...)
 			}
 		} else {
 			for i := 0; i < s.NumField(); i++ {
