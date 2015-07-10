@@ -220,8 +220,11 @@ func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteratio
 error) {
 	const numFileSplitters = 3
 	const numBlockHashers = 3
+
 	sort.Ints(blocksizes)
-	blocksize := blocksizes[len(blocksizes)-1] // get smallest or largest?
+	maxBlockSize := blocksizes[len(blocksizes)-1] // largest block size
+	bloomFilters := make(map[int]*bloom.BloomFilter)
+	hashFiles := make(map[int]*os.File)
 
 	dbpath, err := filepath.Abs(dbpath)
 	if err != nil {
@@ -234,30 +237,38 @@ error) {
 		return nil, err
 	}
 	hashpath += "/"
-	exists, err := CheckExists(hashpath)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		err = os.MkdirAll(hashpath, 0777)
+
+	for _,s := range(blocksizes) {
+		path := hashpath + strconv.Itoa(s)
+		exists, err := CheckExists(path)
 		if err != nil {
 			return nil, err
 		}
+		if !exists {
+			err = os.MkdirAll(path, 0777)
+			if err != nil {
+				return nil, err
+			}
+		}
+		path += "/"
+
+		hashFileName := strconv.AppendInt([]byte(path), int64(iteration), 10)
+		hashFile, err := os.Create(string(hashFileName))
+		if err != nil {
+			return nil, fmt.Errorf("Failed creating file %s to write hashes, iteration %d. Err: %v",
+string(hashFileName), iteration, err)
+		}
+		hashFiles[s] = hashFile
+
+		prevHashFileName := string(strconv.AppendInt([]byte(path), int64(iteration - 1), 10))
+		bloomFilter, err := loadPrevHashes(prevHashFileName, bfFalsePos)
+		if err != nil {
+			return nil, fmt.Errorf("Failed loading previous hashes from %s, iteration %d. Err: %v",
+				string(strconv.AppendInt([]byte(dbpath), int64(iteration - 1), 10)), iteration, err)
+		}
+		bloomFilters[s] = bloomFilter
 	}
 
-	hashFileName := strconv.AppendInt([]byte(hashpath), int64(iteration), 10)
-	hashFile, err := os.Create(string(hashFileName))
-	if err != nil {
-		return nil, fmt.Errorf("Failed creating file %s to write hashes, iteration %d. Err: %v",
-			string(hashFileName), iteration, err)
-	}
-
-	prevHashFileName := string(strconv.AppendInt([]byte(hashpath), int64(iteration - 1), 10))
-	bloomFilter, err := loadPrevHashes(prevHashFileName, bfFalsePos)
-	if err != nil {
-		return nil, fmt.Errorf("Failed loading previous hashes from %s, iteration %d. Err: %v",
-		string(strconv.AppendInt([]byte(dbpath), int64(iteration - 1), 10)), iteration, err)
-	}
 
 	errCh := make(chan error)
 
@@ -308,7 +319,7 @@ error) {
 					break
 				}
 
-				blocks, err := splitFiles(fname, blocksize)
+				blocks, err := splitFiles(fname, maxBlockSize)
 				if err != nil {
 					errCh <- err
 					break
@@ -372,10 +383,14 @@ error) {
 			stat.totalHashes++
 			stat.compressedTotal += h.compressedSize
 			stat.uncompressedTotal += h.uncompressedSize
+
+			hashFile := hashFiles[blocksize]
 			err := writeHash(h, hashFile)
 			if err != nil {
 				errCh <- err
 			}
+
+			bloomFilter := bloomFilters[blocksize]
 			if bloomFilter.TestString(h.hash) {
 				stat.totalDupeCount++
 			}
