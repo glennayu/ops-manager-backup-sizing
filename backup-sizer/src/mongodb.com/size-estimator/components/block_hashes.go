@@ -14,7 +14,6 @@ import (
 	"math"
 	"io/ioutil"
 	"sort"
-	"time"
 )
 
 const kb = 1024
@@ -59,24 +58,6 @@ func splitFiles(fname string) (func([]byte) ([]byte, error), error) {
 	return fun, nil
 }
 
-func splitBlocks(bigBlock []byte, blocksize int) [][]byte {
-	if len(bigBlock) == 0 {
-		return nil
-	}
-	split := make([][]byte, int64(math.Ceil(float64(len(bigBlock)) / float64(blocksize))))
-	si := 0
-	bi := 0
-	for bi + blocksize < len(bigBlock) {
-		slice := bigBlock[bi:bi+blocksize]
-		split[si] = slice
-		si++
-		bi = bi+blocksize
-	}
-	slice := bigBlock[bi:]
-	split[si] = slice
-	return split
-}
-
 type Block struct {
 	blockSize 		 int
 	hash             string
@@ -88,24 +69,30 @@ type Block struct {
 func hashAndCompressBlocks(b []byte, blocksize int) (*[]Block, error) {
 	hasher := sha256.New()
 
-	split := splitBlocks(b, blocksize)
+	blocks := make([]Block, int64(math.Ceil(float64(len(b)) / float64(blocksize))))
 
-	blocks := make([]Block, len(split))
+	bi := 0
+	i := 0
+	for bi < len(b) {
+		blockSizeSlice := int(math.Min(float64(blocksize), float64(len(b) - bi)))
+		slice := b[bi:bi+blockSizeSlice]
 
-	for i, b := range split {
-		_, err := hasher.Write(b)
+		_, err := hasher.Write(slice)
 		if err != nil {
 			return nil, err
 		}
 		hashed := hex.EncodeToString(hasher.Sum(nil))
-		compressedLen, err := getCompressedSize(b)
+		compressedLen, err := getCompressedSize(slice)
 		if err != nil {
 			return nil, err
 		}
 
 		block := Block{blocksize, hashed, compressedLen, len(b)}
 		blocks[i] = block
+
 		hasher.Reset()
+		bi += blockSizeSlice
+		i++
 	}
 
 	return &blocks, nil
@@ -250,8 +237,6 @@ error) {
 	}
 	hashpath += "/"
 
-	timeA := time.Now()
-
 	for _,s := range(blocksizes) {
 		path := hashpath + strconv.Itoa(s)
 		exists, err := CheckExists(path)
@@ -314,7 +299,7 @@ string(hashFileName), iteration, err)
 	// load up all the filenames into fnCh
 	fnCh := readFileNamesToChannel(dbpath, errCh)
 
-	numSlices := numBlockHashers * 10 // currently hardcoded, should be the max number of blocks per file
+	numSlices := numBlockHashers * 10 // currently hardcoded, should be ~ the max number of blocks per file
 
 	emptyBlocksCh := make(chan []byte, numSlices)
 	blocksCh := make(chan []byte, numFileSplitters)
@@ -376,7 +361,7 @@ string(hashFileName), iteration, err)
 						errCh <- err
 					} else {
 						for _, h := range *hashed {
-							hashCh <- h //todo do we need to sort them out based on size?
+							hashCh <- h
 						}
 					}
 				}
@@ -438,10 +423,6 @@ string(hashFileName), iteration, err)
 	if err != nil {
 		return nil, err
 	}
-
-	timeC := time.Now()
-	fmt.Printf("Total time: %v\n", timeC.Sub(timeA))
-
 
 	return &res, nil
 }
