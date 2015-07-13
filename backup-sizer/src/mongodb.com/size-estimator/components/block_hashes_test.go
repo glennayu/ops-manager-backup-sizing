@@ -52,7 +52,7 @@ func TestWritingBlockHashes(test *testing.T) {
 	session := dial(wt_port_custPath)
 
 	dbpath, err := GetDbPath(session)
-	dbpath = "/Users/gryu/test"
+//	dbpath = "/Users/gryu/test"
 	if err != nil {
 		test.Fatalf("Could not get dbpath. err:%v", err)
 	}
@@ -65,10 +65,6 @@ func TestWritingBlockHashes(test *testing.T) {
 	}
 	if bs == nil {
 		test.Errorf("Returned nil")
-	}
-	for size, blockstat := range *bs {
-		fmt.Printf("BlockSize: %d \t DedupRate: %f \t CompressionRate: %f\n", size,
-		blockstat.DedupRate, blockstat.DataCompressionRatio)
 	}
 
 	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate,1,  blocksizes)
@@ -204,50 +200,6 @@ func TestSplitFiles(test *testing.T) {
 	}
 }
 
-func TestSplitBlocks(test *testing.T) {
-	block := make([]byte, 10)
-	for i := range block {
-		block[i] = byte(i)
-	}
-
-	split := splitBlocks(block, 2)
-	for _, s := range split {
-		fmt.Println(s)
-		if len(s) != 2 {
-			test.Errorf("error splitting blocks")
-		}
-	}
-	if len(split) != len(block) / 2 {
-		test.Errorf("error splitting blocks - expected 5 splits, received %d", len(split))
-	}
-
-	// not an even multiple - should still work
-	split = splitBlocks(block[:9], 2)
-	for _, s := range split {
-		fmt.Println(s)
-		if len(s) != 2 {
-			test.Errorf("error splitting blocks")
-		}
-	}
-	if len(split) != len(block) / 2 {
-		test.Errorf("error splitting blocks - expected 5 splits, received %d", len(split))
-	}
-
-	// empty
-	split = splitBlocks([]byte{}, 2)
-	if len(split) != 0 {
-		test.Errorf("error splitting empty block - expected 0 splits, received %d", len(split))
-	}
-
-	split = splitBlocks(block, 15)
-	if len(split) != 1 {
-		test.Errorf("error splitting block - expected 1 splits, received %d", len(split))
-	}
-}
-
-// todo all these things
-
-
 func TestHashAndCompressBlocks(test *testing.T) {
 	hashes := map[string][]string{
 		"empty.test" : emptyHash,
@@ -255,12 +207,6 @@ func TestHashAndCompressBlocks(test *testing.T) {
 		"fiveblocksrandom.test" : fiveBlocksRandomHash,
 		"partialblock.test": partialBlockHash,
 	}
-
-//	compressedSizes := map[string]int{
-//		"empty.test" : emptyCompressed,
-//		"oneblock.test" : oneBlockCompressed,
-//		"partialblock.test": partialBlockCompressed,
-//	}
 
 	fns, err := getFilesInDir(TestDataDir, true)
 	if err != nil {
