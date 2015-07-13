@@ -49,7 +49,7 @@ var blocksizes = []int{64 * kb,
 16 * mb}
 
 func TestWritingBlockHashes(test *testing.T) {
-	session := dial(wt_port_defPath)
+	session := dial(wt_port_custPath)
 
 	dbpath, err := GetDbPath(session)
 	dbpath = "/Users/gryu/test"
@@ -179,7 +179,7 @@ func TestSplitFiles(test *testing.T) {
 		test.Fatalf(err.Error())
 	}
 	for _, fn := range fns {
-		blocks, err := splitFiles(fn, blockSizeBytes)
+		blocks, err := splitFiles(fn)
 		if err != nil {
 			test.Errorf("Failed to split file %s into blocks. Error: %v", fn, err)
 		}
@@ -187,7 +187,8 @@ func TestSplitFiles(test *testing.T) {
 
 		fileNumBlocks := 0
 		for {
-			block, err := blocks()
+			b :=  make([]byte, blockSizeBytes)
+			block, err := blocks(b)
 			if block == nil {
 				if err != nil {
 					test.Errorf("Failed to get block from splitFiles for file %s. Error: %v", fn, err)
