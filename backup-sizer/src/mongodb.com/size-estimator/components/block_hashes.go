@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/willf/bloom"
 	"io"
-	"bytes"
 	"compress/zlib"
 	"path/filepath"
 	"crypto/sha256"
@@ -15,6 +14,7 @@ import (
 	"math"
 	"io/ioutil"
 	"sort"
+	"time"
 )
 
 const kb = 1024
@@ -40,13 +40,12 @@ func readFileNamesToChannel(dir string, errCh chan error) (fnCh chan string) {
 }
 
 
-func splitFiles(fname string, blockSizeBytes int) (func() ([]byte, error), error) {
+func splitFiles(fname string) (func([]byte) ([]byte, error), error) {
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
 	}
-	fun := func() ([]byte, error) {
-		b := make([]byte, blockSizeBytes)
+	fun := func(b []byte) ([]byte, error) {
 		n, err := f.Read(b)
 		if err != nil {
 			if err == io.EOF {
@@ -73,8 +72,7 @@ func splitBlocks(bigBlock []byte, blocksize int) [][]byte {
 		si++
 		bi = bi+blocksize
 	}
-	slice := make([]byte, blocksize)
-	copy(slice, bigBlock[bi:])
+	slice := bigBlock[bi:]
 	split[si] = slice
 	return split
 }
@@ -113,9 +111,23 @@ func hashAndCompressBlocks(b []byte, blocksize int) (*[]Block, error) {
 	return &blocks, nil
 }
 
+type CountingBuffer struct {
+	count 	int
+}
+
+func (cb *CountingBuffer) Write(p []byte) (n int, err error) {
+	cb.count += len(p)
+	return len(p), nil
+}
+
+func (cb *CountingBuffer) Len() (n int) {
+	return cb.count
+}
+
+
 func getCompressedSize(block []byte) (int, error) {
-	var b bytes.Buffer
-	w := zlib.NewWriter(&b)
+	var cb CountingBuffer
+	w := zlib.NewWriter(&cb)
 	_, err := w.Write(block)
 	if err != nil {
 		return 0, err
@@ -124,7 +136,7 @@ func getCompressedSize(block []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return b.Len(), nil
+	return cb.Len(), nil
 }
 
 func writeHash(h Block, file *os.File) error {
@@ -238,6 +250,8 @@ error) {
 	}
 	hashpath += "/"
 
+	timeA := time.Now()
+
 	for _,s := range(blocksizes) {
 		path := hashpath + strconv.Itoa(s)
 		exists, err := CheckExists(path)
@@ -269,9 +283,7 @@ string(hashFileName), iteration, err)
 		bloomFilters[s] = bloomFilter
 	}
 
-
 	errCh := make(chan error)
-
 	finalErr := make(chan error)
 
 	go func() {
@@ -302,12 +314,20 @@ string(hashFileName), iteration, err)
 	// load up all the filenames into fnCh
 	fnCh := readFileNamesToChannel(dbpath, errCh)
 
-	blocksCh := make(chan []byte)
-	hashCh := make(chan Block)
+	numSlices := numBlockHashers * 10 // currently hardcoded, should be the max number of blocks per file
+
+	emptyBlocksCh := make(chan []byte, numSlices)
+	blocksCh := make(chan []byte, numFileSplitters)
+	hashCh := make(chan Block, numBlockHashers)
 	crResChan := make(chan AllBlockSizeStats)
 
 	var blocksWG sync.WaitGroup
 	var hashWG sync.WaitGroup
+
+	for i := 0; i < numSlices; i++ {
+		b := make([]byte, maxBlockSize)
+		emptyBlocksCh <- b
+	}
 
 	for i := 0; i < numFileSplitters; i++ {
 		blocksWG.Add(1)
@@ -319,17 +339,19 @@ string(hashFileName), iteration, err)
 					break
 				}
 
-				blocks, err := splitFiles(fname, maxBlockSize)
+				blocks, err := splitFiles(fname)
 				if err != nil {
 					errCh <- err
 					break
 				}
 				for {
-					block, err := blocks()
+					b := <-emptyBlocksCh
+					block, err := blocks(b)
 					if block == nil {
 						if err != nil {
 							errCh <- err
 						}
+						emptyBlocksCh <- b
 						break
 					}
 					blocksCh <- block
@@ -358,6 +380,7 @@ string(hashFileName), iteration, err)
 						}
 					}
 				}
+				emptyBlocksCh <- b
 			}
 		}()
 	}
@@ -368,10 +391,6 @@ string(hashFileName), iteration, err)
 			allStats[bs] = &BlockStats{}
 		}
 
-//		compressedTotal := 0
-//		uncompressedTotal := 0
-//		totalHashes := 0
-//		totalDupeCount := 0
 		for {
 			h, open := <-hashCh
 			if !open {
@@ -410,6 +429,7 @@ string(hashFileName), iteration, err)
 
 	hashWG.Wait()
 	close(hashCh)
+	close(emptyBlocksCh)
 
 	res := <-crResChan
 	close(errCh)
@@ -418,6 +438,11 @@ string(hashFileName), iteration, err)
 	if err != nil {
 		return nil, err
 	}
+
+	timeC := time.Now()
+	fmt.Printf("Total time: %v\n", timeC.Sub(timeA))
+
+
 	return &res, nil
 }
 

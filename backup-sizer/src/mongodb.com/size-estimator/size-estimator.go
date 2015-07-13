@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strconv"
 	"gopkg.in/mgo.v2/bson"
+	"runtime"
 )
 
 const (
@@ -43,7 +44,6 @@ var (
 	}
 )
 
-
 func init() {
 	flag.StringVar(&host, "host", DefaultHostName, "Hostname to ping")
 	flag.IntVar(&port, "port", DefaultPort, "Port for the offline agent to ping")
@@ -54,6 +54,9 @@ func init() {
 }
 
 func main() {
+	// let this be a flag
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	flag.Parse()
 	uri = fmt.Sprintf("%s:%d", host, port)
 
@@ -144,7 +147,6 @@ func Iterate(iter int) {
 	printVals(&stats)
 }
 
-// todo ok this needs to be fixed but ibunno how welpedy halp
 func printFields() {
 	allStats := []interface{} {
 		&OplogStats{},
@@ -215,26 +217,6 @@ func printVals(allStats *[]interface{}) {
 				f := s.Field(i)
 				val := f.Interface()
 				buffer = append(buffer, toString(val)...)
-//				switch val.(type) {
-//					case int32 :
-//					buffer = strconv.AppendInt(buffer, val.(int64), 10)
-//					case int64 :
-//					buffer = strconv.AppendInt(buffer, val.(int64), 10)
-//					case int :
-//					buffer = append(buffer, strconv.Itoa(val.(int))...)
-//					case float32 :
-//					buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 32)
-//					case float64 :
-//					buffer = strconv.AppendFloat(buffer, val.(float64), 'f', 3, 64)
-//					case string :
-//					buffer = append(buffer, val.(string)...)
-//					default :
-//					strname := reflect.TypeOf(val).Name()
-//					switch strname {
-//					case "MongoTimestamp":
-//						buffer = strconv.AppendInt(buffer, int64(val.(bson.MongoTimestamp)), 10)
-//					}
-//				}
 				buffer = append(buffer, ',')
 			}
 		}
