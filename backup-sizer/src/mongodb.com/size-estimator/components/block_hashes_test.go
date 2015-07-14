@@ -4,9 +4,10 @@ import (
 	"testing"
 	"os"
 	"path/filepath"
-	"fmt"
 	"io"
 	"io/ioutil"
+	"runtime"
+	"fmt"
 )
 
 const TestDataDir = "../../../../test_data"
@@ -28,7 +29,7 @@ var (
 		"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a",
 		"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a",
 		"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a",
-		"d8e5bc7a11ccce349eed8295b268d2a7480285c01578f8f9f20a39ea001b7e63",	}
+		"2edc986847e209b4016e141a6dc8716d3207350f416969382d431539bf292e4a",	}
 )
 
 const emptyCompressed = 31
@@ -48,36 +49,53 @@ var blocksizes = []int{64 * kb,
 8 * mb,
 16 * mb}
 
-func TestWritingBlockHashes(test *testing.T) {
+func testBlockHashes(dbpath string) (err error) {
+
+	opts := BackupSizingOpts{
+		FalsePosRate: 0.01,
+		HashDir: "hashes",
+		NumCPUs: runtime.NumCPU(),
+	}
+
+	bs, err := GetBlockHashes(&opts, dbpath, blocksizes, 0)
+	if err != nil {
+		return
+	}
+	if bs == nil {
+		return fmt.Errorf("Returned nil")
+	}
+
+	bs, err = GetBlockHashes(&opts, dbpath, blocksizes, 1)
+	if err != nil {
+		return fmt.Errorf("Second iteration: %v", err)
+	}
+	if bs == nil {
+		return fmt.Errorf("Returned nil")
+	}
+	return nil
+}
+
+func TestDirectory(test *testing.T) {
+	path := TestDataDir
+	err := testBlockHashes(path)
+	if err != nil {
+		test.Errorf("Error testing path %s. Err: %v", path, err)
+	}
+}
+
+func TestBasic(test *testing.T) {
 	session := dial(wt_port_custPath)
 
 	dbpath, err := GetDbPath(session)
-//	dbpath = "/Users/gryu/test"
 	if err != nil {
 		test.Fatalf("Could not get dbpath. err:%v", err)
 	}
 
-	falsePosRate := 0.01
-
-	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, 0, blocksizes)
+	err = testBlockHashes(dbpath)
 	if err != nil {
-		test.Errorf("failed. Err: %v", err)
+		test.Errorf("Error testing path %s. Err: %v", dbpath, err)
 	}
-	if bs == nil {
-		test.Errorf("Returned nil")
-	}
-
-	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate,1,  blocksizes)
-	if err != nil {
-		test.Errorf("Failed on iteration2. Err:%v", err)
-	}
-	if bs == nil {
-		test.Errorf("Returned nil")
-	}
-	for size, blockstat := range *bs {
-		fmt.Printf("BlockSize: %d \t DedupRate: %f \t CompressionRate: %f\n", size,
-			blockstat.DedupRate, blockstat.DataCompressionRatio)
-	}}
+}
 
 func TestDirPerDB(test *testing.T) {
 	session := dial(replset_wt_dirPerDb)
@@ -87,21 +105,9 @@ func TestDirPerDB(test *testing.T) {
 		test.Fatalf("Could not get dbpath. err:%v", err)
 	}
 
-	falsePosRate := 0.1
-	bs, err := GetBlockHashes(dbpath, "hashes", falsePosRate, 0, blocksizes)
+	err = testBlockHashes(dbpath)
 	if err != nil {
-		test.Errorf("failed. Err: %v", err)
-	}
-	if bs == nil {
-		test.Errorf("Returned nil")
-	}
-
-	bs, err = GetBlockHashes(dbpath, "hashes", falsePosRate, 1, blocksizes)
-	if err != nil {
-		test.Errorf("Failed on iteration2. Err:%v", err)
-	}
-	if bs == nil {
-		test.Errorf("Returned nil")
+		test.Errorf("Error testing path %s. Err: %v", dbpath, err)
 	}
 }
 
@@ -226,8 +232,6 @@ func TestHashAndCompressBlocks(test *testing.T) {
 			test.Errorf(err.Error())
 		}
 
-		fmt.Println(fn, blocks)
-
 		for i, block := range *blocks {
 			h := block.hash
 			exp := hashes[fn][i]
@@ -250,7 +254,7 @@ func TestBloomFilterParams(test *testing.T) {
 	}
 
 	m, k = bloomFilterParams(10, 1)
-	if m != 0 || k != 0 {
+	if m != 1 || k != 0 {
 		test.Errorf("Expected (m, k) = (0, 0). Received m, k = (%d, %d)", m, k)
 	}
 }

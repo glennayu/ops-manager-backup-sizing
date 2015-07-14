@@ -98,8 +98,8 @@ func testSizeStats(test *testing.T, port int) {
 	if err != nil {
 		test.Errorf("Failed to get sizes on port %i. Err %v", port, err)
 	}
-	if sizes3.FileSize != sizes2.FileSize {
-		test.Errorf("File size changed after removing documents. Before:%f, After:%f",
+	if sizes3.FileSize < sizes2.FileSize {
+		test.Errorf("File size decreased after removing documents. Before:%f, After:%f",
 			sizes2.FileSize, sizes3.FileSize)
 	}
 
