@@ -203,6 +203,9 @@ func numHashes(fn string) (int64, error) {
 // n is the size of the set, p is the false positive rate
 // calculated as explained in http://www.cs.utexas.edu/users/lam/386p/slides/Bloom%20Filters.pdf
 func bloomFilterParams(n int64, p float64) (m, k uint) {
+	if n <= 0 || p < 0 || p > 1 {
+		return 1, 0
+	}
 	c := 0.6185 // 0.5 ^ (m/n * ln 2) ~= 0.6185 ^ (m/n)
 	nf := float64(n)
 
@@ -215,10 +218,14 @@ func bloomFilterParams(n int64, p float64) (m, k uint) {
 	return
 }
 
-func GetBlockHashes(dbpath string, hashpath string, bfFalsePos float64, iteration int, blocksizes []int) (*AllBlockSizeStats,
+func GetBlockHashes(opts *BackupSizingOpts, dbpath string, blocksizes []int, iteration int) (*AllBlockSizeStats,
 error) {
+
 	const numFileSplitters = 3
 	const numBlockHashers = 3
+
+	hashpath := opts.HashDir
+	bfFalsePos := opts.FalsePosRate
 
 	sort.Ints(blocksizes)
 	maxBlockSize := blocksizes[len(blocksizes)-1] // largest block size
@@ -299,7 +306,8 @@ string(hashFileName), iteration, err)
 	// load up all the filenames into fnCh
 	fnCh := readFileNamesToChannel(dbpath, errCh)
 
-	numSlices := numBlockHashers * 10 // currently hardcoded, should be ~ the max number of blocks per file
+	// numFileSplitters + len(blocksCh) + numBlockHashers  max number of slices that can be in use at one time
+	numSlices := numFileSplitters * 2 + numBlockHashers
 
 	emptyBlocksCh := make(chan []byte, numSlices)
 	blocksCh := make(chan []byte, numFileSplitters)
@@ -331,6 +339,9 @@ string(hashFileName), iteration, err)
 				}
 				for {
 					b := <-emptyBlocksCh
+					if len(b) != maxBlockSize || cap(b) != maxBlockSize{
+						b = b[:cap(b)]
+					}
 					block, err := blocks(b)
 					if block == nil {
 						if err != nil {

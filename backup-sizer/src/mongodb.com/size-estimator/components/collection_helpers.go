@@ -5,8 +5,62 @@ import (
 	"os"
 	"fmt"
 	"path/filepath"
+	"time"
+	"gopkg.in/mgo.v2/bson"
 )
 
+type BackupSizingOpts struct {
+	Host string
+	Port int
+	SleepTime time.Duration
+	NumIter int
+	Uri string
+	HashDir string
+	FalsePosRate float64
+	NumCPUs int
+}
+
+func (opts BackupSizingOpts) GetSession() (*mgo.Session)  {
+	session, err := mgo.Dial(opts.Uri)
+	if err != nil {
+		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", opts.Uri, err)
+		os.Exit(1)
+	}
+	return session
+}
+
+func (opts BackupSizingOpts) GetDBPath() (string, error) {
+	session := opts.GetSession()
+	defer session.Close()
+
+	return GetDbPath(session)
+}
+
+func GetDbPath(session *mgo.Session) (string, error) {
+	var results (bson.M)
+	session.DB("admin").Run(bson.D{{"getCmdLineOpts",1}}, &results)
+
+	parsed := results["parsed"].(bson.M)
+	v, err := getMongodVersion(session)
+	if err != nil {
+		return "", err
+	}
+
+	var dbpath string = "/data/db" // mongodb default
+	switch v[0:3]{
+	case "2.6" :
+		if parsed["dbpath"] != nil {
+			dbpath = parsed["dbpath"].(string)
+		}
+	default :
+		storage := parsed["storage"].(bson.M)
+		if storage["dbPath"] != nil {
+			dbpath = storage["dbPath"].(string)
+		}
+	}
+
+	return dbpath, err
+}
 
 // STOLEN FROM mms-backup components
 // This method returns whether the collection exists. Due to 2.8
