@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"gopkg.in/mgo.v2"
 	"os"
 	. "mongodb.com/size-estimator/components"
 	"flag"
@@ -25,13 +24,7 @@ const (
 )
 
 var (
-	host string
-	port int
-	sleepTime time.Duration
-	numIter int
 	uri string
-	hashDir string
-	falsePosRate float64
 	blocksizes = []int{64 * kb,
 		128 * kb,
 		256 * kb,
@@ -42,34 +35,36 @@ var (
 		8 * mb,
 		16 * mb,
 	}
+	opts BackupSizingOpts
 )
 
-func init() {
-	flag.StringVar(&host, "host", DefaultHostName, "Hostname to ping")
-	flag.IntVar(&port, "port", DefaultPort, "Port for the offline agent to ping")
-	flag.DurationVar(&sleepTime, "interval", DefaultSleepTime, "How long to sleep between iterations")
-	flag.IntVar(&numIter, "iterations", DefaultIter, "Number of iterations")
-	flag.StringVar(&hashDir, "hashDir", DefaultHashDir, "Directory to store block hashes")
-	flag.Float64Var(&falsePosRate, "falsePos", DefaultFalsePosRate, "False positive rate for duplicated hashes")
+func NewOptionsFromCmdLine() (BackupSizingOpts) {
+	opts := BackupSizingOpts{}
+	flag.StringVar(&opts.Host, "host", DefaultHostName, "Hostname to ping")
+	flag.IntVar(&opts.Port, "port", DefaultPort, "Port for the offline agent to ping")
+	flag.DurationVar(&opts.SleepTime, "interval", DefaultSleepTime, "How long to sleep between iterations")
+	flag.IntVar(&opts.NumIter, "iterations", DefaultIter, "Number of iterations")
+	flag.StringVar(&opts.HashDir, "hashDir", DefaultHashDir, "Directory to store block hashes")
+	flag.Float64Var(&opts.FalsePosRate, "falsePos", DefaultFalsePosRate, "False positive rate for duplicated hashes")
+	flag.IntVar(&opts.NumCPUs, "numCPUs", runtime.NumCPU(), "Max number of CPUs to use")
+	flag.Parse()
+
+	opts.Uri = fmt.Sprintf("%s:%d", opts.Host, opts.Port)
+
+	return opts
 }
 
 func main() {
-	// let this be a flag
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	opts = NewOptionsFromCmdLine()
 
-	flag.Parse()
-	uri = fmt.Sprintf("%s:%d", host, port)
+	runtime.GOMAXPROCS(opts.NumCPUs)
 
-	fmt.Printf("Running on port %s every %v for %d iterations.\n", uri, sleepTime, numIter)
+	fmt.Printf("Running on port %s every %v for %d iterations.\n", opts.Uri, opts.SleepTime, opts.NumIter)
 
-	session, err := mgo.Dial(uri)
-	if err != nil {
-		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", uri, err)
-		os.Exit(1)
-	}
+	session := opts.GetSession()
 	defer session.Close()
 
-	err = session.Ping();
+	err := session.Ping();
 	if err != nil {
 		fmt.Printf("Failed to contact server on %s. Err %v\n", uri, err)
 		os.Exit(1)
@@ -77,15 +72,15 @@ func main() {
 
 	fmt.Printf("Successfully connected to %s\n", uri);
 
-	exists, err := CheckExists(hashDir)
+	exists, err := CheckExists(opts.HashDir)
 	if err != nil {
-		fmt.Printf("Failure checking directory %s exists. Err %v\n", hashDir, err)
+		fmt.Printf("Failure checking directory %s exists. Err %v\n", opts.HashDir, err)
 		os.Exit(1)
 	}
 	if exists {
-		err := os.RemoveAll(hashDir)
+		err := os.RemoveAll(opts.HashDir)
 		if err != nil {
-			fmt.Printf("Failure removing directory %s. Err %v\n", hashDir, err)
+			fmt.Printf("Failure removing directory %s. Err %v\n", opts.HashDir, err)
 		}
 	}
 	Run()
@@ -94,7 +89,7 @@ func main() {
 func Run() {
 		printFields()
 
-	for iter := 0; iter < numIter; iter++ {
+	for iter := 0; iter < opts.NumIter; iter++ {
 		start := time.Now()
 		Iterate(iter)
 		sleep := RemainingSleepTime(start)
@@ -103,18 +98,14 @@ func Run() {
 }
 
 func RemainingSleepTime(start time.Time) time.Duration {
-	return sleepTime - time.Now().Sub(start)
+	return opts.SleepTime - time.Now().Sub(start)
 }
 
 func Iterate(iter int) {
-	session, err := mgo.Dial(uri)
-	if err != nil {
-		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", uri, err)
-		return
-	}
+	session := opts.GetSession()
 	defer session.Close()
 
-	oplogStats, err := GetOplogStats(session, sleepTime)
+	oplogStats, err := GetOplogStats(session, opts.SleepTime)
 	if err != nil {
 		fmt.Printf("Failed to get oplog stats on server %s. Err: %v\n", uri, err)
 		os.Exit(1)
@@ -132,8 +123,7 @@ func Iterate(iter int) {
 		os.Exit(1)
 	}
 
-
-	blockStats, err := GetBlockHashes(dbpath, hashDir, falsePosRate, iter, blocksizes)
+	blockStats, err := GetBlockHashes(&opts, dbpath, blocksizes, iter)
 	if err != nil {
 		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
 		os.Exit(1)
