@@ -33,7 +33,10 @@ func readFileNamesToChannel(dir string, errCh chan error) (fnCh chan string) {
 
 
 	for _, fname := range files {
-		fnCh <- fname
+		if filepath.Base(fname) != "mongodb.log" {
+//			fmt.Println(fname)
+			fnCh <- fname
+		}
 	}
 	return fnCh
 }
@@ -87,7 +90,7 @@ func hashAndCompressBlocks(b []byte, blocksize int) (*[]Block, error) {
 			return nil, err
 		}
 
-		block := Block{blocksize, hashed, compressedLen, len(b)}
+		block := Block{blocksize, hashed, compressedLen, len(slice)}
 		blocks[i] = block
 
 		hasher.Reset()
