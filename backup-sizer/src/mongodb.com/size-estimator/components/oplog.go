@@ -6,8 +6,8 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"bytes"
-	"github.com/golang/snappy/snappy"
 	"fmt"
+	"github.com/golang/snappy"
 )
 
 type OplogInfo struct {
@@ -94,10 +94,7 @@ func CompressionRatio(iter *mgo.Iter) (float64, error) {
 		if len(dataBuffer.Bytes()) > minSize {
 			uncompressed = uncompressed + len(dataBuffer.Bytes())
 
-			compressedBytes, err := snappy.Encode(nil, dataBuffer.Bytes())
-			if err != nil {
-				return 0, err
-			}
+			compressedBytes := snappy.Encode(nil, dataBuffer.Bytes())
 			compressed = compressed + len(compressedBytes)
 
 			dataBuffer.Reset()
@@ -107,10 +104,7 @@ func CompressionRatio(iter *mgo.Iter) (float64, error) {
 	if len(dataBuffer.Bytes()) != 0 {
 		uncompressed = uncompressed + len(dataBuffer.Bytes())
 
-		compressedBytes, err := snappy.Encode(nil, dataBuffer.Bytes())
-		if err != nil {
-			return 0, err
-		}
+		compressedBytes := snappy.Encode(nil, dataBuffer.Bytes())
 		compressed = compressed + len(compressedBytes)
 	}
 
