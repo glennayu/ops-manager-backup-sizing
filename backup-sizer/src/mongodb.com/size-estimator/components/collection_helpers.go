@@ -118,13 +118,6 @@ func collExists(coll *mgo.Collection) (bool, error) {
 	return false, nil
 }
 
-
-// exclude for MMAP:
-// ["mongod.lock", "local.*", "mongodb.log", "journal"]
-
-// exclude for WT:
-// ["mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal", --local???--]
-
 func excludeFile(exclude *[]string, fname string) (bool, error) {
 	for _, excludeString := range *exclude {
 		match, err := regexp.Match(excludeString, ([]byte)(fname))
@@ -160,17 +153,17 @@ func getFilesInDir(dir string, storageEngine StorageEngine, crawlFurther bool) (
 
 	files := make([]string, 0)
 
-	var exclude []string
+	var excludeRegexes []string
 	switch storageEngine {
 	case wiredTiger:
-		exclude = []string{"mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal"} //, --local???--]
+		excludeRegexes = []string{"mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal"}
 	case mmap:
-		exclude = []string{"mongod.lock", "local.*", "mongodb.log", "journal"}
+		excludeRegexes = []string{"mongod.lock", "local.*", "mongodb.log", "journal"}
 	}
 
 	for _, fi := range fileInfos {
 		absPath := dir + "/" + fi.Name()
-		exclude, err := excludeFile (&exclude, fi.Name())
+		exclude, err := excludeFile (&excludeRegexes, fi.Name())
 		if err != nil {
 			return nil, err
 		}
