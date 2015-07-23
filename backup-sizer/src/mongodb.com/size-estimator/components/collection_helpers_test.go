@@ -1,7 +1,7 @@
 package components
 import (
 	"testing"
-	"fmt"
+	"path/filepath"
 )
 
 func TestGetStorageEngine(test *testing.T) {
@@ -43,6 +43,9 @@ func TestGetFilesInDir(test *testing.T) {
 		test.Errorf("Expected 4 files. Received %d. Files returned: %v", len(files), files)
 	}
 	for _, f := range files {
-		fmt.Println(f)
+		fn := filepath.Base(f)
+		if fn == "local.0" || fn == "journal1" {
+			test.Errorf("Unwanted file included: %s", fn)
+		}
 	}
 }

@@ -125,7 +125,6 @@ func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(result, session);
 
 	times := result["oplog"].(bson.M)
 

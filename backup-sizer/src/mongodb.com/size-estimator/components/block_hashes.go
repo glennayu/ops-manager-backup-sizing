@@ -33,10 +33,7 @@ func readFileNamesToChannel(dir string, storageEngine StorageEngine, errCh chan 
 
 
 	for _, fname := range files {
-		if filepath.Base(fname) != "mongodb.log" {
-//			fmt.Println(fname)
 			fnCh <- fname
-		}
 	}
 	return fnCh
 }
@@ -206,7 +203,7 @@ func numHashes(fn string) (int64, error) {
 // n is the size of the set, p is the false positive rate
 // calculated as explained in http://www.cs.utexas.edu/users/lam/386p/slides/Bloom%20Filters.pdf
 func bloomFilterParams(n int64, p float64) (m, k uint) {
-	if n <= 0 || p < 0 || p > 1 {
+	if n <= 0 || p <= 0 || p >= 1 {
 		return 1, 0
 	}
 	c := 0.6185 // 0.5 ^ (m/n * ln 2) ~= 0.6185 ^ (m/n)

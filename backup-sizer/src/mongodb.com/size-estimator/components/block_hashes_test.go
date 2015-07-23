@@ -249,13 +249,13 @@ func TestBloomFilterParams(test *testing.T) {
 	}
 
 	m, k = bloomFilterParams(0, 0.5)
-	if m != 0 || k != 0 {
+	if m != 1 || k != 0 {
 		test.Errorf("Expected (m, k) = (0, 0). Received m, k = (%d, %d)", m, k)
 	}
 
 	m, k = bloomFilterParams(10, 1)
 	if m != 1 || k != 0 {
-		test.Errorf("Expected (m, k) = (0, 0). Received m, k = (%d, %d)", m, k)
+		test.Errorf("Expected (m, k) = (1, 0). Received m, k = (%d, %d)", m, k)
 	}
 }
 
