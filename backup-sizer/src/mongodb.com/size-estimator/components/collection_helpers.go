@@ -59,7 +59,8 @@ func getStorageEngine(session *mgo.Session) (StorageEngine, error) {
 	}
 
 	storageEngine := result["storageEngine"].(bson.M)
-	return storageEngine["name"].(StorageEngine), nil
+	se := StorageEngine(storageEngine["name"].(string))
+	return se, nil
 }
 
 func GetDbPath(session *mgo.Session) (string, error) {

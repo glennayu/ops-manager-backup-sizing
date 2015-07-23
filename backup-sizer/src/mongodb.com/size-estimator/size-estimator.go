@@ -24,7 +24,6 @@ const (
 )
 
 var (
-	uri string
 	blocksizes = []int{64 * kb,
 		128 * kb,
 		256 * kb,
@@ -66,11 +65,11 @@ func main() {
 
 	err := session.Ping();
 	if err != nil {
-		fmt.Printf("Failed to contact server on %s. Err %v\n", uri, err)
+		fmt.Printf("Failed to contact server on %s. Err %v\n", opts.Uri, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Successfully connected to %s\n", uri);
+	fmt.Printf("Successfully connected to %s\n", opts.Uri);
 
 	exists, err := CheckExists(opts.HashDir)
 	if err != nil {
@@ -107,25 +106,25 @@ func Iterate(iter int) {
 
 	oplogStats, err := GetOplogStats(session, opts.SleepTime)
 	if err != nil {
-		fmt.Printf("Failed to get oplog stats on server %s. Err: %v\n", uri, err)
+		fmt.Printf("Failed to get oplog stats on server %s. Err: %v\n", opts.Uri, err)
 		os.Exit(1)
 	}
 
 	sizeStats, err := GetSizeStats(session)
 	if err != nil {
-		fmt.Printf("Failed to get sizing stats on server %s. Err: %v\n", uri, err)
+		fmt.Printf("Failed to get sizing stats on server %s. Err: %v\n", opts.Uri, err)
 		os.Exit(1)
 	}
 
 	dbpath, err := GetDbPath(session)
 	if err != nil {
-		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", uri, err)
+		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", opts.Uri, err)
 		os.Exit(1)
 	}
 
 	blockStats, err := GetBlockHashes(&opts, dbpath, blocksizes, iter)
 	if err != nil {
-		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", uri, err)
+		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", opts.Uri, err)
 		os.Exit(1)
 	}
 	stats := []interface{}{
