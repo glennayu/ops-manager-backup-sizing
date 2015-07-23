@@ -125,7 +125,7 @@ func TestReadFileNames(test *testing.T) {
 
 	var fnCh chan string
 	go func() {
-		fnCh = readFileNamesToChannel("./DoesNotExist", errCh)
+		fnCh = readFileNamesToChannel("./DoesNotExist", mmap, errCh)
 	}()
 	err = <-errCh
 	if err == nil {
@@ -140,7 +140,7 @@ func TestReadFileNames(test *testing.T) {
 	}
 
 	go func() {
-		fnCh = readFileNamesToChannel(empty_dir, errCh)
+		fnCh = readFileNamesToChannel(empty_dir, mmap, errCh)
 	}()
 	fn, open = <-fnCh
 	if open {
@@ -150,7 +150,7 @@ func TestReadFileNames(test *testing.T) {
 		test.Errorf("Unexpected filename in empty directory:%s", fn)
 	}
 
-	fnCh = readFileNamesToChannel(TestDataDir, errCh)
+	fnCh = readFileNamesToChannel(TestDataDir, mmap, errCh)
 	fncount := 0
 	for fn := range fnCh {
 		fi, err := os.Stat(fn)
@@ -176,7 +176,7 @@ func TestSplitFiles(test *testing.T) {
 		"subdir.test" : 5,
 		"partialblock.test": 6,
 	}
-	fns, err := getFilesInDir(TestDataDir, false)
+	fns, err := getFilesInDir(TestDataDir, mmap, false)
 	if err != nil {
 		test.Fatalf(err.Error())
 	}
@@ -214,7 +214,7 @@ func TestHashAndCompressBlocks(test *testing.T) {
 		"partialblock.test": partialBlockHash,
 	}
 
-	fns, err := getFilesInDir(TestDataDir, true)
+	fns, err := getFilesInDir(TestDataDir, mmap, true)
 	if err != nil {
 		test.Fatalf(err.Error())
 	}
