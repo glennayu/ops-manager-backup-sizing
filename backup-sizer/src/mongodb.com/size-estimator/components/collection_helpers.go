@@ -7,6 +7,14 @@ import (
 	"path/filepath"
 	"time"
 	"gopkg.in/mgo.v2/bson"
+	"regexp"
+)
+
+type StorageEngine string
+
+const (
+	wiredTiger 	StorageEngine = "wiredTiger"
+	mmap 		StorageEngine = "mmapv1"
 )
 
 type BackupSizingOpts struct {
@@ -36,6 +44,24 @@ func (opts BackupSizingOpts) GetDBPath() (string, error) {
 	return GetDbPath(session)
 }
 
+func (opts BackupSizingOpts) GetStorageEngine() (StorageEngine, error) {
+	session := opts.GetSession()
+	defer session.Close()
+
+	return getStorageEngine(session)
+}
+
+func getStorageEngine(session *mgo.Session) (StorageEngine, error) {
+	var result bson.M
+	err := serverStatus(session, &result)
+	if err != nil {
+		return "", err
+	}
+
+	storageEngine := result["storageEngine"].(bson.M)
+	return storageEngine["name"].(StorageEngine), nil
+}
+
 func GetDbPath(session *mgo.Session) (string, error) {
 	var results (bson.M)
 	session.DB("admin").Run(bson.D{{"getCmdLineOpts",1}}, &results)
@@ -48,7 +74,7 @@ func GetDbPath(session *mgo.Session) (string, error) {
 
 	var dbpath string = "/data/db" // mongodb default
 	switch v[0:3]{
-	case "2.6" :
+case "2.6" :
 		if parsed["dbpath"] != nil {
 			dbpath = parsed["dbpath"].(string)
 		}
@@ -60,6 +86,13 @@ func GetDbPath(session *mgo.Session) (string, error) {
 	}
 
 	return dbpath, err
+}
+
+func serverStatus(session *mgo.Session, result *bson.M) (error) {
+	if err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"oplog", 1}}, result); err != nil {
+		return err
+	}
+	return nil
 }
 
 // STOLEN FROM mms-backup components
@@ -84,7 +117,27 @@ func collExists(coll *mgo.Collection) (bool, error) {
 	return false, nil
 }
 
-func getFilesInDir(dir string, crawlFurther bool) ([]string, error) {
+
+// exclude for MMAP:
+// ["mongod.lock", "local.*", "mongodb.log", "journal"]
+
+// exclude for WT:
+// ["mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal", --local???--]
+
+func excludeFile(exclude *[]string, fname string) (bool, error) {
+	for _, excludeString := range *exclude {
+		match, err := regexp.Match(excludeString, ([]byte)(fname))
+		if err != nil {
+			return false, err
+		}
+		if match {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func getFilesInDir(dir string, storageEngine StorageEngine, crawlFurther bool) ([]string, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -106,10 +159,25 @@ func getFilesInDir(dir string, crawlFurther bool) ([]string, error) {
 
 	files := make([]string, 0)
 
+	var exclude []string
+	switch storageEngine {
+	case wiredTiger:
+		exclude = []string{"mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal"} //, --local???--]
+	case mmap:
+		exclude = []string{"mongod.lock", "local.*", "mongodb.log", "journal"}
+	}
+
 	for _, fi := range fileInfos {
 		absPath := dir + "/" + fi.Name()
+		exclude, err := excludeFile (&exclude, fi.Name())
+		if err != nil {
+			return nil, err
+		}
+		if exclude {
+			continue
+		}
 		if fi.IsDir() && crawlFurther {
-			subDirFiles, err := getFilesInDir(absPath, false)
+			subDirFiles, err := getFilesInDir(absPath, storageEngine, false)
 			if err != nil {
 				return nil, err
 			}

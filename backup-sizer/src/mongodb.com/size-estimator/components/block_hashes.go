@@ -20,8 +20,8 @@ const kb = 1024
 const blockSizeBytes = 64 * kb
 const hashSize = 65
 
-func readFileNamesToChannel(dir string, errCh chan error) (fnCh chan string) {
-	files, err := getFilesInDir(dir, true)
+func readFileNamesToChannel(dir string, storageEngine StorageEngine, errCh chan error) (fnCh chan string) {
+	files, err := getFilesInDir(dir, storageEngine, true)
 	if err != nil {
 		errCh <- err
 		fnCh = make(chan string)
@@ -307,7 +307,11 @@ string(hashFileName), iteration, err)
 	}()
 
 	// load up all the filenames into fnCh
-	fnCh := readFileNamesToChannel(dbpath, errCh)
+	storageEngine, err := opts.GetStorageEngine()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get storage engine for session on port %s. Err: %v", opts.Uri, err)
+	}
+	fnCh := readFileNamesToChannel(dbpath, storageEngine, errCh)
 
 	// numFileSplitters + len(blocksCh) + numBlockHashers  max number of slices that can be in use at one time
 	numSlices := numFileSplitters * 2 + numBlockHashers
