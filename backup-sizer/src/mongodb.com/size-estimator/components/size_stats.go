@@ -11,9 +11,8 @@ type SizeStats struct {
 	FileSize	float64
 }
 
-
-func sumDirFiles(dir string, crawlFurther bool) (int64, error) {
-	files, err := getFilesInDir(dir, true)
+func sumDirFiles(dir string, storageEngine StorageEngine, crawlFurther bool) (int64, error) {
+	files, err := getFilesInDir(dir, storageEngine, true)
 	if err != nil {
 		return 0, err
 	}
@@ -34,7 +33,7 @@ func getWTFileSize(session *mgo.Session) (float64, error) {
 		return 0, err
 	}
 
-	fileSize, err := sumDirFiles(dbpath, true)
+	fileSize, err := sumDirFiles(dbpath, wiredTiger, true)
 	if err != nil {
 		return 0, err
 	}

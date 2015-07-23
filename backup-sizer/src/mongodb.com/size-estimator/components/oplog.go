@@ -120,10 +120,12 @@ func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
 		return nil, OplogNotFoundError
 	}
 
-	var result (bson.M)
-	if err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"oplog", 1}}, &result); err != nil {
+	var result bson.M
+	err = serverStatus(session, &result)
+	if err != nil {
 		return nil, err
 	}
+	fmt.Println(result, session);
 
 	times := result["oplog"].(bson.M)
 
