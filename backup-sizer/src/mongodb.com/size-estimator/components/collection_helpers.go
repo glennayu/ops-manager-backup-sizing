@@ -32,7 +32,7 @@ type BackupSizingOpts struct {
 func (opts BackupSizingOpts) GetSession() (*mgo.Session)  {
 	session, err := mgo.Dial(opts.Uri)
 	if err != nil {
-		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", opts.Uri, err)
+		fmt.Printf("Failed to dial MongoDB on port %s. Err %v\n", opts.Uri, err)
 		os.Exit(1)
 	}
 	return session
@@ -177,7 +177,21 @@ func GetExcludeFileRegexes(session *mgo.Session) (*[]string, error){
 	return &excludeRegexes, nil
 }
 
-func getFilesInDir(dir string, session *mgo.Session, crawlFurther bool) ([]string, error) {
+func GetDBFiles(session *mgo.Session) (*[]string, error) {
+	excludeRegexes, err := GetExcludeFileRegexes(session)
+	if err != nil {
+		return nil, err
+	}
+
+	dbpath, err := GetDbPath(session)
+	if err != nil {
+		return nil, err
+	}
+
+	return GetFilesInDir(dbpath, excludeRegexes, true)
+}
+
+func GetFilesInDir(dir string, excludeRegexes *[]string, crawlFurther bool) (*[]string, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -199,11 +213,6 @@ func getFilesInDir(dir string, session *mgo.Session, crawlFurther bool) ([]strin
 
 	files := make([]string, 0)
 
-	excludeRegexes, err := GetExcludeFileRegexes(session)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, fi := range fileInfos {
 		absPath := dir + "/" + fi.Name()
 		exclude, err := excludeFile (excludeRegexes, fi.Name())
@@ -214,14 +223,14 @@ func getFilesInDir(dir string, session *mgo.Session, crawlFurther bool) ([]strin
 			continue
 		}
 		if fi.IsDir() && crawlFurther {
-			subDirFiles, err := getFilesInDir(absPath, session, false)
+			subDirFiles, err := GetFilesInDir(absPath, excludeRegexes, false)
 			if err != nil {
 				return nil, err
 			}
-			files = append(files, subDirFiles...)
+			files = append(files, *subDirFiles...)
 		} else if !fi.IsDir(){
 			files = append(files, absPath)
 		}
 	}
-	return files, nil
+	return &files, nil
 }

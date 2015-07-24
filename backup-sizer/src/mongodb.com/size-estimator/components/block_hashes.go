@@ -21,20 +21,19 @@ const kb = 1024
 const blockSizeBytes = 64 * kb
 const hashSize = 65
 
-func readFileNamesToChannel(dir string, session *mgo.Session, errCh chan error) (fnCh chan string) {
-	files, err := getFilesInDir(dir, session, true)
+func readFileNamesToChannel(session *mgo.Session, errCh chan error) (fnCh chan string) {
+	files, err := GetDBFiles(session)
 	if err != nil {
 		errCh <- err
 		fnCh = make(chan string)
 		close(fnCh)
 		return
 	}
-	fnCh = make(chan string, len(files))
+	fnCh = make(chan string, len(*files))
 	defer close(fnCh)
 
-
-	for _, fname := range files {
-			fnCh <- fname
+	for _, fname := range *files {
+		fnCh <- fname
 	}
 	return fnCh
 }
@@ -219,7 +218,7 @@ func bloomFilterParams(n int64, p float64) (m, k uint) {
 	return
 }
 
-func GetBlockHashes(opts *BackupSizingOpts, dbpath string, blocksizes []int, iteration int) (*AllBlockSizeStats,
+func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*AllBlockSizeStats,
 error) {
 
 	const numFileSplitters = 3
@@ -233,7 +232,11 @@ error) {
 	bloomFilters := make(map[int]*bloom.BloomFilter)
 	hashFiles := make(map[int]*os.File)
 
-	dbpath, err := filepath.Abs(dbpath)
+	dbpath, err := opts.GetDBPath()
+	if err != nil {
+		return nil, err
+	}
+	dbpath, err = filepath.Abs(dbpath)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +308,7 @@ string(hashFileName), iteration, err)
 	}()
 
 	// load up all the filenames into fnCh
-	fnCh := readFileNamesToChannel(dbpath, opts.GetSession(), errCh)
+	fnCh := readFileNamesToChannel(opts.GetSession(), errCh)
 
 	// numFileSplitters + len(blocksCh) + numBlockHashers  max number of slices that can be in use at one time
 	numSlices := numFileSplitters * 2 + numBlockHashers

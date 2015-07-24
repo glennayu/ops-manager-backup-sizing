@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"runtime"
 	"fmt"
+	"strconv"
 )
 
 const TestDataDir = "../../../../test_data"
@@ -49,15 +50,19 @@ var blocksizes = []int{64 * kb,
 8 * mb,
 16 * mb}
 
-func testBlockHashes(dbpath string) (err error) {
+func testBlockHashes(port int) (err error) {
+	uri := "localhost:" + strconv.Itoa(port)
 
 	opts := BackupSizingOpts{
+		Uri: uri,
 		FalsePosRate: 0.01,
 		HashDir: "hashes",
 		NumCPUs: runtime.NumCPU(),
 	}
 
-	bs, err := GetBlockHashes(&opts, dbpath, blocksizes, 0)
+	runtime.GOMAXPROCS(opts.NumCPUs)
+
+	bs, err := GetBlockHashes(&opts, blocksizes, 0)
 	if err != nil {
 		return
 	}
@@ -65,7 +70,7 @@ func testBlockHashes(dbpath string) (err error) {
 		return fmt.Errorf("Returned nil")
 	}
 
-	bs, err = GetBlockHashes(&opts, dbpath, blocksizes, 1)
+	bs, err = GetBlockHashes(&opts, blocksizes, 1)
 	if err != nil {
 		return fmt.Errorf("Second iteration: %v", err)
 	}
@@ -75,99 +80,59 @@ func testBlockHashes(dbpath string) (err error) {
 	return nil
 }
 
-func TestDirectory(test *testing.T) {
-	path := TestDataDir
-	err := testBlockHashes(path)
+func TestMmap(test *testing.T) {
+	err := testBlockHashes(replset_port)
 	if err != nil {
-		test.Errorf("Error testing path %s. Err: %v", path, err)
-	}
-}
-
-func TestBasic(test *testing.T) {
-	session := dial(wt_port_custPath)
-
-	dbpath, err := GetDbPath(session)
-	if err != nil {
-		test.Fatalf("Could not get dbpath. err:%v", err)
-	}
-
-	err = testBlockHashes(dbpath)
-	if err != nil {
-		test.Errorf("Error testing path %s. Err: %v", dbpath, err)
+		test.Errorf("Error testing port %i. Err: %v", replset_port, err)
 	}
 }
 
 func TestDirPerDB(test *testing.T) {
-	session := dial(replset_wt_dirPerDb)
-
-	dbpath, err := GetDbPath(session)
+	err := testBlockHashes(replset_wt_dirPerDb)
 	if err != nil {
-		test.Fatalf("Could not get dbpath. err:%v", err)
-	}
-
-	err = testBlockHashes(dbpath)
-	if err != nil {
-		test.Errorf("Error testing path %s. Err: %v", dbpath, err)
+		test.Errorf("Error testing port %i. Err: %v", replset_wt_dirPerDb, err)
 	}
 }
-
-func TestReadFileNames(test *testing.T) {
-	// empty directory
-	errCh := make(chan error)
-
-	exists, err := CheckExists(empty_dir)
-	if err != nil {
-		test.Fatalf("Failure to check %s exists", empty_dir)
-	}
-	if !exists {
-		test.Errorf("%s does not exist", empty_dir)
-	}
-
-	var fnCh chan string
-	go func() {
-		fnCh = readFileNamesToChannel("./DoesNotExist", mmap, errCh)
-	}()
-	err = <-errCh
-	if err == nil {
-		test.Errorf("Expected an error")
-	}
-	fn, open := <-fnCh
-	if open {
-		test.Errorf("Failed to close filename channel. File:%s", fn)
-	}
-	if fn != "" {
-		test.Errorf("Unexpected filename in non-existant directory:%s", fn)
-	}
-
-	go func() {
-		fnCh = readFileNamesToChannel(empty_dir, mmap, errCh)
-	}()
-	fn, open = <-fnCh
-	if open {
-		test.Errorf("Failed to close filename channel. File:%s", fn)
-	}
-	if fn != "" {
-		test.Errorf("Unexpected filename in empty directory:%s", fn)
-	}
-
-	fnCh = readFileNamesToChannel(TestDataDir, mmap, errCh)
-	fncount := 0
-	for fn := range fnCh {
-		fi, err := os.Stat(fn)
-		if err != nil {
-			test.Errorf("Error with file %s. Error: &v", fn, err)
-		} else if fi.IsDir() {
-			test.Errorf("Unexpected directory in filename channel: %s", fn)
-		} else {
-			fncount++
-		}
-	}
-	if fncount != 4 {
-		test.Errorf("Expected four filenames from directory %s. Received: %d", TestDataDir, fncount)
-	}
-
-}
-
+//
+//func TestReadFileNames(test *testing.T) {
+//	session := dial(replset_port)
+//	errCh := make(chan error)
+//
+//	var fnCh chan string
+//	fmt.Println("Enter1")
+//	fnCh = readFileNamesToChannel(session, errCh)
+//	select {
+//	case err := <-errCh:
+//		fmt.Println("err1")
+//		if err != nil {
+//			test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_port, err)
+//		}
+//	default:
+//	}
+//	fn, open := <-fnCh
+//	fmt.Println("fn1")
+//
+//	if open {
+//		test.Errorf("Failed to close filename channel. File:%s", fn)
+//	}
+//
+//	session = dial(replset_wt_dirPerDb)
+//	// empty directory
+//	errCh = make(chan error)
+//	fmt.Println("enter2")
+//	fnCh = readFileNamesToChannel(session, errCh)
+//	select {
+//	case err := <-errCh:
+//		if err != nil {
+//			test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_wt_dirPerDb, err)
+//		}
+//	default:
+//	}
+//	fn, open = <-fnCh
+//	if open {
+//		test.Errorf("Failed to close filename channel.")
+//	}
+//}
 
 func TestSplitFiles(test *testing.T) {
 	numBlocks := map[string]int {
@@ -176,11 +141,12 @@ func TestSplitFiles(test *testing.T) {
 		"subdir.test" : 5,
 		"partialblock.test": 6,
 	}
-	fns, err := getFilesInDir(TestDataDir, mmap, false)
+	excludedFiles := []string{"journal", "local*"}
+	fns, err := GetFilesInDir(TestDataDir, &excludedFiles, false)
 	if err != nil {
 		test.Fatalf(err.Error())
 	}
-	for _, fn := range fns {
+	for _, fn := range *fns {
 		blocks, err := splitFiles(fn)
 		if err != nil {
 			test.Errorf("Failed to split file %s into blocks. Error: %v", fn, err)
@@ -206,6 +172,33 @@ func TestSplitFiles(test *testing.T) {
 	}
 }
 
+func TestGetExcludeFileRegexes(test *testing.T) {
+	session := dial(replset_port)
+	excludedFiles, err := GetExcludeFileRegexes(session)
+	if err != nil {
+		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_port, err)
+	}
+	if len(*excludedFiles) != 4 {
+		test.Errorf("Expected 4 regexes for session running on mmapv1. Received: %v", excludedFiles)
+	}
+
+	session = dial(replset_wt_dirPerDb)
+	excludedFiles, err = GetExcludeFileRegexes(session)
+	if err != nil {
+		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_wt_dirPerDb, err)
+	}
+	if len(*excludedFiles) != 5 {
+		test.Errorf("Expected 4 regexes for session running on wiredTiger. Received: %v", excludedFiles)
+	}
+
+	session = dial(wt_port_defPath)
+	excludedFiles, err = GetExcludeFileRegexes(session)
+	if err == nil {
+		test.Errorf("Expected error for missing oplog. Received %v", excludedFiles)
+	}
+	fmt.Println(err)
+}
+
 func TestHashAndCompressBlocks(test *testing.T) {
 	hashes := map[string][]string{
 		"empty.test" : emptyHash,
@@ -214,11 +207,12 @@ func TestHashAndCompressBlocks(test *testing.T) {
 		"partialblock.test": partialBlockHash,
 	}
 
-	fns, err := getFilesInDir(TestDataDir, mmap, true)
+	excludedFiles := []string{"local*", "journal"}
+	fns, err := GetFilesInDir(TestDataDir, &excludedFiles, true)
 	if err != nil {
 		test.Fatalf(err.Error())
 	}
-	for _, fn := range fns {
+	for _, fn := range *fns {
 		f, err := os.Open(fn)
 		fn := filepath.Base(fn)
 		b, err := ioutil.ReadAll(f)

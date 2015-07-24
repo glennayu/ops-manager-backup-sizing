@@ -2,13 +2,14 @@ package components
 import (
 	"testing"
 	"path/filepath"
+	"os"
 )
 
 func TestGetStorageEngine(test *testing.T) {
-	sess := dial(wt_port_custPath)
+	sess := dial(wt_port_defPath)
 	se, err := getStorageEngine(sess)
 	if err != nil {
-		test.Errorf("Failed getting storageEngine for port %v. Err: %v", wt_port_custPath, err)
+		test.Errorf("Failed getting storageEngine for port %v. Err: %v", wt_port_defPath, err)
 	}
 	if se != "wiredTiger" {
 		test.Errorf("Expected storage engine wiredTiger, received %s", se)
@@ -35,16 +36,47 @@ func TestGetStorageEngine(test *testing.T) {
 }
 
 func TestGetFilesInDir(test *testing.T) {
-	files, err := getFilesInDir(TestDataDir, mmap, true)
+	excludedFiles := []string{"journal", "local*"}
+
+	exists, err := CheckExists(empty_dir)
+	if err != nil {
+		test.Fatalf("Failure to check %s exists", empty_dir)
+	}
+	if !exists {
+		test.Errorf("%s does not exist", empty_dir)
+	}
+
+	var files *[]string
+	files, err = GetFilesInDir("./DoesNotExist", &excludedFiles, true)
+	if err == nil {
+		test.Errorf("Expected an error")
+	}
+	if files != nil {
+		test.Errorf("Return value from non-existant directory: %v", files)
+	}
+
+	files, err = GetFilesInDir(empty_dir, &excludedFiles, true)
+	if len(*files) != 0 {
+		test.Errorf("Return value from empty directory:%v", files)
+	}
+
+	files, err = GetFilesInDir(TestDataDir, &excludedFiles, true)
 	if err != nil {
 		test.Errorf("Failed getting files from test directory. %v", err)
 	}
-	if len(files) != 4 {
-		test.Errorf("Expected 4 files. Received %d. Files returned: %v", len(files), files)
+	if len(*files) != 4 {
+		test.Errorf("Expected 4 files. Received %d. Files returned: %v", len(*files), files)
 	}
-	for _, f := range files {
-		fn := filepath.Base(f)
-		if fn == "local.0" || fn == "journal1" {
+	for _, fn := range *files {
+		fi, err := os.Stat(fn)
+		if err != nil {
+			test.Errorf("Error with file %s. Error: &v", fn, err)
+		}
+		if fi.IsDir() {
+			test.Errorf("Unexpected directory in returned files: %s", fn)
+		}
+		base := filepath.Base(fn)
+		if base == "local.0" || base == "journal1" {
 			test.Errorf("Unwanted file included: %s", fn)
 		}
 	}
