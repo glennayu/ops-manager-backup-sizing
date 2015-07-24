@@ -115,14 +115,14 @@ func Iterate(iter int) {
 		fmt.Printf("Failed to get sizing stats on server %s. Err: %v\n", opts.Uri, err)
 		os.Exit(1)
 	}
+//
+//	dbpath, err := GetDbPath(session)
+//	if err != nil {
+//		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", opts.Uri, err)
+//		os.Exit(1)
+//	}
 
-	dbpath, err := GetDbPath(session)
-	if err != nil {
-		fmt.Printf("Failed to get directory path for session on server %s. Err:%v\n", opts.Uri, err)
-		os.Exit(1)
-	}
-
-	blockStats, err := GetBlockHashes(&opts, dbpath, blocksizes, iter)
+	blockStats, err := GetBlockHashes(&opts, blocksizes, iter)
 	if err != nil {
 		fmt.Printf("Failed to get block hashes on server %s. Err %v\n", opts.Uri, err)
 		os.Exit(1)

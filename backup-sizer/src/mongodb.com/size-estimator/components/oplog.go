@@ -1,13 +1,13 @@
 package components
 
 import (
-	"bytes"
+	"time"
 	"errors"
-	"fmt"
-	"github.com/golang/snappy"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"time"
+	"bytes"
+	"fmt"
+	"github.com/golang/snappy"
 )
 
 type OplogInfo struct {
@@ -34,8 +34,8 @@ func (info *OplogInfo) GbPerDay() (float64, error) {
 
 	if first > last {
 		return 0,
-			fmt.Errorf("Start timestamp (%f) cannot be later than end timestamp (%f)\n",
-				info.startTS, info.endTS)
+		fmt.Errorf("Start timestamp (%f) cannot be later than end timestamp (%f)\n",
+			info.startTS, info.endTS)
 	}
 
 	totalTime := last - first
@@ -54,14 +54,14 @@ func (info *OplogInfo) GbPerDay() (float64, error) {
 }
 
 func GetOplogIterator(startTime time.Time, timeInterval time.Duration,
-	session *mgo.Session) (*mgo.Iter, error) {
+session *mgo.Session) (*mgo.Iter, error) {
 	oplogColl, err := getOplogColl(session)
 	if err != nil {
 		return nil, err
 	}
 
 	startTS := bson.MongoTimestamp(
-		startTime.Add(-1*timeInterval).Unix() << 32,
+		startTime.Add(-1 * timeInterval).Unix() << 32,
 	)
 
 	qry := bson.M{
@@ -141,8 +141,8 @@ func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
 
 	return &OplogInfo{
 		startTS: firstMTS,
-		endTS:   lastMTS,
-		size:    size,
+		endTS: lastMTS,
+		size: size,
 	}, nil
 }
 
@@ -161,11 +161,11 @@ func getMongodVersion(session *mgo.Session) (string, error) {
 
 func getOplogSize(session *mgo.Session) (int, error) {
 	var result (bson.M)
-	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, &result)
-
+	err := GetOplogCollStats(session, &result)
 	if err != nil {
 		return -1, err
 	}
+
 	if result["capped"] == false {
 		return -1, errors.New("Oplog is not capped")
 	}
@@ -220,3 +220,4 @@ func GetOplogStats(session *mgo.Session, timeInterval time.Duration) (*OplogStat
 		gb / cr,
 	}, nil
 }
+
