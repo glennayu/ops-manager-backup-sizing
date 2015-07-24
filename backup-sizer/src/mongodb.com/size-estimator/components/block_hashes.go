@@ -14,14 +14,15 @@ import (
 	"math"
 	"io/ioutil"
 	"sort"
+	"gopkg.in/mgo.v2"
 )
 
 const kb = 1024
 const blockSizeBytes = 64 * kb
 const hashSize = 65
 
-func readFileNamesToChannel(dir string, storageEngine StorageEngine, errCh chan error) (fnCh chan string) {
-	files, err := getFilesInDir(dir, storageEngine, true)
+func readFileNamesToChannel(dir string, session *mgo.Session, errCh chan error) (fnCh chan string) {
+	files, err := getFilesInDir(dir, session, true)
 	if err != nil {
 		errCh <- err
 		fnCh = make(chan string)
@@ -304,11 +305,7 @@ string(hashFileName), iteration, err)
 	}()
 
 	// load up all the filenames into fnCh
-	storageEngine, err := opts.GetStorageEngine()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get storage engine for session on port %s. Err: %v", opts.Uri, err)
-	}
-	fnCh := readFileNamesToChannel(dbpath, storageEngine, errCh)
+	fnCh := readFileNamesToChannel(dbpath, opts.GetSession(), errCh)
 
 	// numFileSplitters + len(blocksCh) + numBlockHashers  max number of slices that can be in use at one time
 	numSlices := numFileSplitters * 2 + numBlockHashers

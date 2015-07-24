@@ -8,6 +8,7 @@ import (
 	"time"
 	"gopkg.in/mgo.v2/bson"
 	"regexp"
+	"strings"
 )
 
 type StorageEngine string
@@ -44,12 +45,10 @@ func (opts BackupSizingOpts) GetDBPath() (string, error) {
 	return GetDbPath(session)
 }
 
-func (opts BackupSizingOpts) GetStorageEngine() (StorageEngine, error) {
-	session := opts.GetSession()
-	defer session.Close()
+/************** END BackupSizingOpts *************/
 
-	return getStorageEngine(session)
-}
+
+
 
 func getStorageEngine(session *mgo.Session) (StorageEngine, error) {
 	var result bson.M
@@ -96,6 +95,8 @@ func serverStatus(session *mgo.Session, result *bson.M) (error) {
 	return nil
 }
 
+
+
 // STOLEN FROM mms-backup components
 // This method returns whether the collection exists. Due to 2.8
 // supporting multiple storage engines, this cannot rely on only
@@ -118,6 +119,8 @@ func collExists(coll *mgo.Collection) (bool, error) {
 	return false, nil
 }
 
+/************ get the right files *******/
+
 func excludeFile(exclude *[]string, fname string) (bool, error) {
 	for _, excludeString := range *exclude {
 		match, err := regexp.Match(excludeString, ([]byte)(fname))
@@ -131,7 +134,50 @@ func excludeFile(exclude *[]string, fname string) (bool, error) {
 	return false, nil
 }
 
-func getFilesInDir(dir string, storageEngine StorageEngine, crawlFurther bool) ([]string, error) {
+func GetOplogCollStats(session *mgo.Session, result *bson.M) (error) {
+	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, &result)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// only for WT
+func GetOplogFile(session *mgo.Session) string {
+	var result bson.M
+	err := GetOplogCollStats(session, &result)
+	if err != nil {
+		return ""
+	}
+
+	wtDoc := result["wiredTiger"].(bson.M)
+	if wtDoc == nil {
+		return ""
+	}
+
+	filebase := strings.TrimPrefix(wtDoc["uri"].(string), "statistics:table:")
+	return filebase
+}
+
+func GetExcludeFileRegexes(session *mgo.Session) (*[]string, error){
+	storageEngine, err := getStorageEngine(session)
+	if err != nil {
+		return nil, err
+	}
+
+	var excludeRegexes []string
+	switch storageEngine {
+	case wiredTiger:
+		oplogFile := GetOplogFile(session)
+		excludeRegexes = []string{"mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal", oplogFile}
+	case mmap:
+		excludeRegexes = []string{"mongod.lock", "local.*", "mongodb.log", "journal"}
+	}
+
+	return &excludeRegexes, nil
+}
+
+func getFilesInDir(dir string, session *mgo.Session, crawlFurther bool) ([]string, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -153,17 +199,14 @@ func getFilesInDir(dir string, storageEngine StorageEngine, crawlFurther bool) (
 
 	files := make([]string, 0)
 
-	var excludeRegexes []string
-	switch storageEngine {
-	case wiredTiger:
-		excludeRegexes = []string{"mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal"}
-	case mmap:
-		excludeRegexes = []string{"mongod.lock", "local.*", "mongodb.log", "journal"}
+	excludeRegexes, err := GetExcludeFileRegexes(session)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, fi := range fileInfos {
 		absPath := dir + "/" + fi.Name()
-		exclude, err := excludeFile (&excludeRegexes, fi.Name())
+		exclude, err := excludeFile (excludeRegexes, fi.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -171,7 +214,7 @@ func getFilesInDir(dir string, storageEngine StorageEngine, crawlFurther bool) (
 			continue
 		}
 		if fi.IsDir() && crawlFurther {
-			subDirFiles, err := getFilesInDir(absPath, storageEngine, false)
+			subDirFiles, err := getFilesInDir(absPath, session, false)
 			if err != nil {
 				return nil, err
 			}
