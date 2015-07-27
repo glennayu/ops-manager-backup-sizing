@@ -1,21 +1,21 @@
 package components
 
 import (
-	"testing"
-	"os"
-	"path/filepath"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"runtime"
-	"fmt"
+	"testing"
 )
 
 const TestDataDir = "../../../../test_data"
 const empty_dir = TestDataDir + "/emptydir"
 
 var (
-	emptyHash = []string{"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
-	oneBlockHash = []string{"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a"}
+	emptyHash            = []string{"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+	oneBlockHash         = []string{"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a"}
 	fiveBlocksRandomHash = []string{
 		"9d7451e9b5c0de62376f69c6d5b64add2f4c4ff0aad3946a460aa180c2e1531f",
 		"90ee39300cb64565ed12a95234c76aa8986fff7ffede914e99de02b6f3123f3c",
@@ -29,7 +29,7 @@ var (
 		"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a",
 		"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a",
 		"bf718b6f653bebc184e1479f1935b8da974d701b893afcf49e701f3e2f9f9c5a",
-		"2edc986847e209b4016e141a6dc8716d3207350f416969382d431539bf292e4a",	}
+		"2edc986847e209b4016e141a6dc8716d3207350f416969382d431539bf292e4a"}
 )
 
 const emptyCompressed = 31
@@ -37,24 +37,24 @@ const fiveBlocksCompressed = 369
 const oneBlockCompressed = 111
 const partialBlockCompressed = 372
 
-const mb = 1024*kb
+const mb = 1024 * kb
 
 var blocksizes = []int{64 * kb,
-128 * kb,
-256 * kb,
-512 * kb,
-1 * mb,
-2 * mb,
-4 * mb,
-8 * mb,
-16 * mb}
+	128 * kb,
+	256 * kb,
+	512 * kb,
+	1 * mb,
+	2 * mb,
+	4 * mb,
+	8 * mb,
+	16 * mb}
 
 func testBlockHashes(dbpath string) (err error) {
 
 	opts := BackupSizingOpts{
 		FalsePosRate: 0.01,
-		HashDir: "hashes",
-		NumCPUs: runtime.NumCPU(),
+		HashDir:      "hashes",
+		NumCPUs:      runtime.NumCPU(),
 	}
 
 	bs, err := GetBlockHashes(&opts, dbpath, blocksizes, 0)
@@ -168,12 +168,11 @@ func TestReadFileNames(test *testing.T) {
 
 }
 
-
 func TestSplitFiles(test *testing.T) {
-	numBlocks := map[string]int {
-		"empty.test" : 0,
-		"oneblock.test" : 1,
-		"subdir.test" : 5,
+	numBlocks := map[string]int{
+		"empty.test":        0,
+		"oneblock.test":     1,
+		"subdir.test":       5,
 		"partialblock.test": 6,
 	}
 	fns, err := getFilesInDir(TestDataDir, mmap, false)
@@ -189,7 +188,7 @@ func TestSplitFiles(test *testing.T) {
 
 		fileNumBlocks := 0
 		for {
-			b :=  make([]byte, blockSizeBytes)
+			b := make([]byte, blockSizeBytes)
 			block, err := blocks(b)
 			if block == nil {
 				if err != nil {
@@ -208,10 +207,10 @@ func TestSplitFiles(test *testing.T) {
 
 func TestHashAndCompressBlocks(test *testing.T) {
 	hashes := map[string][]string{
-		"empty.test" : emptyHash,
-		"oneblock.test" : oneBlockHash,
-		"fiveblocksrandom.test" : fiveBlocksRandomHash,
-		"partialblock.test": partialBlockHash,
+		"empty.test":            emptyHash,
+		"oneblock.test":         oneBlockHash,
+		"fiveblocksrandom.test": fiveBlocksRandomHash,
+		"partialblock.test":     partialBlockHash,
 	}
 
 	fns, err := getFilesInDir(TestDataDir, mmap, true)
@@ -288,5 +287,3 @@ func TestLoadPrevHashes(test *testing.T) {
 	}
 
 }
-
-

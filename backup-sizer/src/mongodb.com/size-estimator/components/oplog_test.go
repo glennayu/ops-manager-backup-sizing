@@ -1,10 +1,11 @@
 package components
+
 import (
-	"testing"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"time"
 	"math"
+	"testing"
+	"time"
 )
 
 type oplogInfoTest struct {
@@ -14,8 +15,8 @@ type oplogInfoTest struct {
 }
 
 func TestGbPerDay(test *testing.T) {
-	const MB = 1024*1024
-	const GB = 1024*1024*1024
+	const MB = 1024 * 1024
+	const GB = 1024 * 1024 * 1024
 	const SecPerDay = 86400
 
 	testCases := []oplogInfoTest{
@@ -25,19 +26,19 @@ func TestGbPerDay(test *testing.T) {
 			GB}, 1, "basic"},
 		{&OplogInfo{
 			bson.MongoTimestamp(time.Now().Unix() << 32),
-			bson.MongoTimestamp(time.Now().Add(72 * time.Hour).Unix() << 32),
-			193 * MB}, float64(193) / float64(1024 * 3), "normal case"},
+			bson.MongoTimestamp(time.Now().Add(72*time.Hour).Unix() << 32),
+			193 * MB}, float64(193) / float64(1024*3), "normal case"},
 		{&OplogInfo{
 			bson.MongoTimestamp(0),
 			bson.MongoTimestamp(0),
 			0}, 0 * SecPerDay, "start, end, size = 0"},
 		{&OplogInfo{
-			bson.MongoTimestamp(int64(5) << 32 | 0),
-			bson.MongoTimestamp(int64(5) << 32 | 5),
+			bson.MongoTimestamp(int64(5)<<32 | 0),
+			bson.MongoTimestamp(int64(5)<<32 | 5),
 			1 * GB}, 1 * SecPerDay, "total time < 1 second, with multiple entries"},
 		{&OplogInfo{
-			bson.MongoTimestamp(int64(5) << 32 | 5),
-			bson.MongoTimestamp(int64(5) << 32 | 5),
+			bson.MongoTimestamp(int64(5)<<32 | 5),
+			bson.MongoTimestamp(int64(5)<<32 | 5),
 			1 * GB}, 1 * SecPerDay, "total time < 1 second, with one entry"},
 	}
 
@@ -58,8 +59,8 @@ func TestGbPerDay(test *testing.T) {
 
 	info := OplogInfo{
 		bson.MongoTimestamp(time.Now().Unix() << 32),
-		bson.MongoTimestamp(time.Now().Add(-1 * time.Hour).Unix() << 32),
-		1*MB}
+		bson.MongoTimestamp(time.Now().Add(-1*time.Hour).Unix() << 32),
+		1 * MB}
 	gb, err := info.GbPerDay()
 	if err == nil {
 		test.Errorf("Expected error for start > end. Result: %f", gb)
@@ -84,10 +85,10 @@ func TestGetIterator(test *testing.T) {
 		test.Errorf("Empty collection - expected empty iterator")
 	}
 
-	time.Sleep(3*time.Second)
+	time.Sleep(3 * time.Second)
 	timeA := time.Now()
 	insertDocuments(session, dbName, collName, 10)
-	time.Sleep(3*time.Second)
+	time.Sleep(3 * time.Second)
 	timeB := time.Now()
 	it, err = GetOplogIterator(timeB, timeB.Sub(timeA), session)
 	if err != nil {
@@ -103,7 +104,7 @@ func TestGetIterator(test *testing.T) {
 		test.Errorf("Expected 10 documents, received %d", len(results))
 	}
 
-	time.Sleep(3*time.Second)
+	time.Sleep(3 * time.Second)
 	insertDocuments(session, dbName, collName, 5)
 	it, err = GetOplogIterator(time.Now(), 3*time.Second, session)
 	if err != nil {
@@ -135,7 +136,6 @@ func TestCompressionRatio(test *testing.T) {
 	session := dial(replset_port)
 	defer session.Close()
 
-
 	session.DB(dbName).DropDatabase()
 
 	coll := session.DB(dbName).C(collName)
@@ -150,14 +150,13 @@ func TestCompressionRatio(test *testing.T) {
 		test.Errorf("Empty collection - expected NaN, received %f", cr)
 	}
 
-	coll.Insert(bson.M{"a":1})
+	coll.Insert(bson.M{"a": 1})
 	it = coll.Find(bson.M{}).Iter()
 	cr, err = CompressionRatio(it)
 	if err != nil {
 		test.Fatalf("Failed to get compression ratio for collection %v", coll)
 	}
 	coll.DropCollection()
-
 
 	// write a bunch of repeated bytes to it - expected higher compression
 	generateBytes(session, dbName, collName, 50*1024, bytesSame)
@@ -223,7 +222,6 @@ func TestGetOplogInfo(test *testing.T) {
 	const numDocs = 10
 	insertDocuments(session, dbName, collName, numDocs)
 
-
 	info2, err := GetOplogInfo(session)
 	if err != nil {
 		test.Fatal("Error getting oplog start/end times")
@@ -234,7 +232,7 @@ func TestGetOplogInfo(test *testing.T) {
 			info1.endTS, info2.endTS)
 	}
 
-	time.Sleep(5*time.Second)
+	time.Sleep(5 * time.Second)
 	size := info2.size
 	generateBytes(session, dbName, collName, uint64(size), bytesSame)
 
@@ -249,6 +247,3 @@ func TestGetOplogInfo(test *testing.T) {
 			info1.startTS, info3.startTS)
 	}
 }
-
-
-
