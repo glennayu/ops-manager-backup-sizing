@@ -93,46 +93,47 @@ func TestDirPerDB(test *testing.T) {
 		test.Errorf("Error testing port %i. Err: %v", replset_wt_dirPerDb, err)
 	}
 }
-//
-//func TestReadFileNames(test *testing.T) {
-//	session := dial(replset_port)
-//	errCh := make(chan error)
-//
-//	var fnCh chan string
-//	fmt.Println("Enter1")
-//	fnCh = readFileNamesToChannel(session, errCh)
-//	select {
-//	case err := <-errCh:
-//		fmt.Println("err1")
-//		if err != nil {
-//			test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_port, err)
-//		}
-//	default:
-//	}
-//	fn, open := <-fnCh
-//	fmt.Println("fn1")
-//
-//	if open {
-//		test.Errorf("Failed to close filename channel. File:%s", fn)
-//	}
-//
-//	session = dial(replset_wt_dirPerDb)
-//	// empty directory
-//	errCh = make(chan error)
-//	fmt.Println("enter2")
-//	fnCh = readFileNamesToChannel(session, errCh)
-//	select {
-//	case err := <-errCh:
-//		if err != nil {
-//			test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_wt_dirPerDb, err)
-//		}
-//	default:
-//	}
-//	fn, open = <-fnCh
-//	if open {
-//		test.Errorf("Failed to close filename channel.")
-//	}
-//}
+
+func TestReadFileNames(test *testing.T) {
+	session := dial(replset_port)
+	errCh := make(chan error)
+
+	var fnCh chan string
+	fnCh = readFileNamesToChannel(session, errCh)
+	open := true
+	for open {
+		select {
+		case err := <-errCh:
+			if err != nil {
+				test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_port, err)
+			}
+		case _, open = <- fnCh:
+		default:
+		}
+	}
+	fn, open := <-fnCh
+	if open {
+		test.Errorf("Failed to close filename channel. File:%s", fn)
+	}
+
+	// subdirectories
+	session = dial(replset_wt_dirPerDb)
+	errCh = make(chan error)
+	fnCh = readFileNamesToChannel(session, errCh)
+	for open {
+		select {
+		case err := <-errCh:
+			if err != nil {
+				test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_port, err)
+			}
+		case _, open = <- fnCh:
+		default:
+		}
+	}
+	if open {
+		test.Errorf("Failed to close filename channel. File:%s", fn)
+	}
+}
 
 func TestSplitFiles(test *testing.T) {
 	numBlocks := map[string]int {
@@ -170,33 +171,6 @@ func TestSplitFiles(test *testing.T) {
 				fileNumBlocks)
 		}
 	}
-}
-
-func TestGetExcludeFileRegexes(test *testing.T) {
-	session := dial(replset_port)
-	excludedFiles, err := GetExcludeFileRegexes(session)
-	if err != nil {
-		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_port, err)
-	}
-	if len(*excludedFiles) != 4 {
-		test.Errorf("Expected 4 regexes for session running on mmapv1. Received: %v", excludedFiles)
-	}
-
-	session = dial(replset_wt_dirPerDb)
-	excludedFiles, err = GetExcludeFileRegexes(session)
-	if err != nil {
-		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_wt_dirPerDb, err)
-	}
-	if len(*excludedFiles) != 5 {
-		test.Errorf("Expected 4 regexes for session running on wiredTiger. Received: %v", excludedFiles)
-	}
-
-	session = dial(wt_port_defPath)
-	excludedFiles, err = GetExcludeFileRegexes(session)
-	if err == nil {
-		test.Errorf("Expected error for missing oplog. Received %v", excludedFiles)
-	}
-	fmt.Println(err)
 }
 
 func TestHashAndCompressBlocks(test *testing.T) {

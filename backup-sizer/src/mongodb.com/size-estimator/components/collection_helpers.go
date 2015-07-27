@@ -159,7 +159,10 @@ func GetOplogFile(session *mgo.Session) string {
 	return filebase
 }
 
-func GetExcludeFileRegexes(session *mgo.Session) (*[]string, error){
+func GetExcludeFileRegexes(session *mgo.Session) (*[]string, error) {
+	if session == nil {
+		return nil, fmt.Errorf("Failure to get regexes for files to exclude--session is nil")
+	}
 	storageEngine, err := getStorageEngine(session)
 	if err != nil {
 		return nil, err
