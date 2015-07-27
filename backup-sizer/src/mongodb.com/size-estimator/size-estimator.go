@@ -1,25 +1,25 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	. "mongodb.com/size-estimator/components"
 	"flag"
-	"time"
-	"reflect"
-	"strconv"
+	"fmt"
 	"gopkg.in/mgo.v2/bson"
+	. "mongodb.com/size-estimator/components"
+	"os"
+	"reflect"
 	"runtime"
+	"strconv"
+	"time"
 )
 
 const (
-	kb = 1024
-	mb = 1024 * kb
-	DefaultPort = 27017
-	DefaultHostName = "localhost"
-	DefaultSleepTime = time.Duration(6*time.Hour)
-	DefaultIter = 12
-	DefaultHashDir = "hashes"
+	kb                  = 1024
+	mb                  = 1024 * kb
+	DefaultPort         = 27017
+	DefaultHostName     = "localhost"
+	DefaultSleepTime    = time.Duration(6 * time.Hour)
+	DefaultIter         = 12
+	DefaultHashDir      = "hashes"
 	DefaultFalsePosRate = 0.01
 )
 
@@ -37,7 +37,7 @@ var (
 	opts BackupSizingOpts
 )
 
-func NewOptionsFromCmdLine() (BackupSizingOpts) {
+func NewOptionsFromCmdLine() BackupSizingOpts {
 	opts := BackupSizingOpts{}
 	flag.StringVar(&opts.Host, "host", DefaultHostName, "Hostname to ping")
 	flag.IntVar(&opts.Port, "port", DefaultPort, "Port for the offline agent to ping")
@@ -63,13 +63,13 @@ func main() {
 	session := opts.GetSession()
 	defer session.Close()
 
-	err := session.Ping();
+	err := session.Ping()
 	if err != nil {
 		fmt.Printf("Failed to contact server on %s. Err %v\n", opts.Uri, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Successfully connected to %s\n", opts.Uri);
+	fmt.Printf("Successfully connected to %s\n", opts.Uri)
 
 	exists, err := CheckExists(opts.HashDir)
 	if err != nil {
@@ -86,7 +86,7 @@ func main() {
 }
 
 func Run() {
-		printFields()
+	printFields()
 
 	for iter := 0; iter < opts.NumIter; iter++ {
 		start := time.Now()
@@ -137,7 +137,7 @@ func Iterate(iter int) {
 }
 
 func printFields() {
-	allStats := []interface{} {
+	allStats := []interface{}{
 		&OplogStats{},
 		&SizeStats{},
 	}
@@ -148,7 +148,7 @@ func printFields() {
 		s := reflect.ValueOf(stats).Elem()
 
 		for i := 0; i < s.NumField(); i++ {
-			buffer = append(buffer, s.Type().Field(i).Name ...)
+			buffer = append(buffer, s.Type().Field(i).Name...)
 			buffer = append(buffer, ',')
 		}
 	}
@@ -159,23 +159,23 @@ func printFields() {
 		buffer = append(buffer, s...)
 	}
 
-	fmt.Println(string(buffer[0:len(buffer) - 1]))
+	fmt.Println(string(buffer[0 : len(buffer)-1]))
 }
 
 func toString(val interface{}) []byte {
 	var s string
 	switch val.(type) {
-		case int32, int64 :
+	case int32, int64:
 		s = strconv.FormatInt(val.(int64), 10)
-		case int :
+	case int:
 		s = strconv.Itoa(val.(int))
-		case float32 :
+	case float32:
 		s = strconv.FormatFloat(val.(float64), 'f', 3, 32)
-		case float64 :
+	case float64:
 		s = strconv.FormatFloat(val.(float64), 'f', 3, 64)
-		case string :
+	case string:
 		s = val.(string)
-		default :
+	default:
 		strname := reflect.TypeOf(val).Name()
 		switch strname {
 		case "MongoTimestamp":
@@ -196,10 +196,10 @@ func printVals(allStats *[]interface{}) {
 			blockStatsMapPtr := stats.(*AllBlockSizeStats)
 			for _, size := range blocksizes {
 				blockstat := (*blockStatsMapPtr)[size]
-				buffer = append(buffer, toString(blockstat.DedupRate) ...)
-				buffer = append(buffer, "," ...)
+				buffer = append(buffer, toString(blockstat.DedupRate)...)
+				buffer = append(buffer, ","...)
 				buffer = append(buffer, toString(blockstat.DataCompressionRatio)...)
-				buffer = append(buffer, "," ...)
+				buffer = append(buffer, ","...)
 			}
 		} else {
 			for i := 0; i < s.NumField(); i++ {
@@ -210,7 +210,7 @@ func printVals(allStats *[]interface{}) {
 			}
 		}
 	}
-	str := string(buffer[0:len(buffer)-1])
+	str := string(buffer[0 : len(buffer)-1])
 	fmt.Println(str)
 	return
 }

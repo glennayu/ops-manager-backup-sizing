@@ -1,34 +1,34 @@
 package components
 
 import (
-	"gopkg.in/mgo.v2"
-	"os"
 	"fmt"
-	"path/filepath"
-	"time"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"os"
+	"path/filepath"
 	"regexp"
+	"time"
 )
 
 type StorageEngine string
 
 const (
-	wiredTiger 	StorageEngine = "wiredTiger"
-	mmap 		StorageEngine = "mmapv1"
+	wiredTiger StorageEngine = "wiredTiger"
+	mmap       StorageEngine = "mmapv1"
 )
 
 type BackupSizingOpts struct {
-	Host string
-	Port int
-	SleepTime time.Duration
-	NumIter int
-	Uri string
-	HashDir string
+	Host         string
+	Port         int
+	SleepTime    time.Duration
+	NumIter      int
+	Uri          string
+	HashDir      string
 	FalsePosRate float64
-	NumCPUs int
+	NumCPUs      int
 }
 
-func (opts BackupSizingOpts) GetSession() (*mgo.Session)  {
+func (opts BackupSizingOpts) GetSession() *mgo.Session {
 	session, err := mgo.Dial(opts.Uri)
 	if err != nil {
 		fmt.Printf("Failed to dial MongoDB on port %v. Err %v\n", opts.Uri, err)
@@ -65,7 +65,7 @@ func getStorageEngine(session *mgo.Session) (StorageEngine, error) {
 
 func GetDbPath(session *mgo.Session) (string, error) {
 	var results (bson.M)
-	session.DB("admin").Run(bson.D{{"getCmdLineOpts",1}}, &results)
+	session.DB("admin").Run(bson.D{{"getCmdLineOpts", 1}}, &results)
 
 	parsed := results["parsed"].(bson.M)
 	v, err := getMongodVersion(session)
@@ -74,12 +74,12 @@ func GetDbPath(session *mgo.Session) (string, error) {
 	}
 
 	var dbpath string = "/data/db" // mongodb default
-	switch v[0:3]{
-case "2.6" :
+	switch v[0:3] {
+	case "2.6":
 		if parsed["dbpath"] != nil {
 			dbpath = parsed["dbpath"].(string)
 		}
-	default :
+	default:
 		storage := parsed["storage"].(bson.M)
 		if storage["dbPath"] != nil {
 			dbpath = storage["dbPath"].(string)
@@ -89,7 +89,7 @@ case "2.6" :
 	return dbpath, err
 }
 
-func serverStatus(session *mgo.Session, result *bson.M) (error) {
+func serverStatus(session *mgo.Session, result *bson.M) error {
 	if err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"oplog", 1}}, result); err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func getFilesInDir(dir string, storageEngine StorageEngine, crawlFurther bool) (
 
 	for _, fi := range fileInfos {
 		absPath := dir + "/" + fi.Name()
-		exclude, err := excludeFile (&excludeRegexes, fi.Name())
+		exclude, err := excludeFile(&excludeRegexes, fi.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +176,7 @@ func getFilesInDir(dir string, storageEngine StorageEngine, crawlFurther bool) (
 				return nil, err
 			}
 			files = append(files, subDirFiles...)
-		} else if !fi.IsDir(){
+		} else if !fi.IsDir() {
 			files = append(files, absPath)
 		}
 	}

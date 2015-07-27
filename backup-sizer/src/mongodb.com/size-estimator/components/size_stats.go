@@ -1,4 +1,5 @@
 package components
+
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -6,9 +7,9 @@ import (
 )
 
 type SizeStats struct {
-	DataSize 	float64
-	IndexSize	float64
-	FileSize	float64
+	DataSize  float64
+	IndexSize float64
+	FileSize  float64
 }
 
 func sumDirFiles(dir string, storageEngine StorageEngine, crawlFurther bool) (int64, error) {
