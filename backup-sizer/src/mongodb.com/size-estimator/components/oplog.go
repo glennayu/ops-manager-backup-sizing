@@ -1,13 +1,13 @@
 package components
 
 import (
-	"time"
+	"bytes"
 	"errors"
+	"fmt"
+	"github.com/golang/snappy"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"bytes"
-	"github.com/golang/snappy/snappy"
-	"fmt"
+	"time"
 )
 
 type OplogInfo struct {
@@ -34,8 +34,8 @@ func (info *OplogInfo) GbPerDay() (float64, error) {
 
 	if first > last {
 		return 0,
-		fmt.Errorf("Start timestamp (%f) cannot be later than end timestamp (%f)\n",
-			info.startTS, info.endTS)
+			fmt.Errorf("Start timestamp (%f) cannot be later than end timestamp (%f)\n",
+				info.startTS, info.endTS)
 	}
 
 	totalTime := last - first
@@ -54,14 +54,14 @@ func (info *OplogInfo) GbPerDay() (float64, error) {
 }
 
 func GetOplogIterator(startTime time.Time, timeInterval time.Duration,
-session *mgo.Session) (*mgo.Iter, error) {
+	session *mgo.Session) (*mgo.Iter, error) {
 	oplogColl, err := getOplogColl(session)
 	if err != nil {
 		return nil, err
 	}
 
 	startTS := bson.MongoTimestamp(
-		startTime.Add(-1 * timeInterval).Unix() << 32,
+		startTime.Add(-1*timeInterval).Unix() << 32,
 	)
 
 	qry := bson.M{
@@ -94,10 +94,7 @@ func CompressionRatio(iter *mgo.Iter) (float64, error) {
 		if len(dataBuffer.Bytes()) > minSize {
 			uncompressed = uncompressed + len(dataBuffer.Bytes())
 
-			compressedBytes, err := snappy.Encode(nil, dataBuffer.Bytes())
-			if err != nil {
-				return 0, err
-			}
+			compressedBytes := snappy.Encode(nil, dataBuffer.Bytes())
 			compressed = compressed + len(compressedBytes)
 
 			dataBuffer.Reset()
@@ -107,10 +104,7 @@ func CompressionRatio(iter *mgo.Iter) (float64, error) {
 	if len(dataBuffer.Bytes()) != 0 {
 		uncompressed = uncompressed + len(dataBuffer.Bytes())
 
-		compressedBytes, err := snappy.Encode(nil, dataBuffer.Bytes())
-		if err != nil {
-			return 0, err
-		}
+		compressedBytes := snappy.Encode(nil, dataBuffer.Bytes())
 		compressed = compressed + len(compressedBytes)
 	}
 
@@ -126,8 +120,9 @@ func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
 		return nil, OplogNotFoundError
 	}
 
-	var result (bson.M)
-	if err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"oplog", 1}}, &result); err != nil {
+	var result bson.M
+	err = serverStatus(session, &result)
+	if err != nil {
 		return nil, err
 	}
 
@@ -146,8 +141,8 @@ func GetOplogInfo(session *mgo.Session) (*OplogInfo, error) {
 
 	return &OplogInfo{
 		startTS: firstMTS,
-		endTS: lastMTS,
-		size: size,
+		endTS:   lastMTS,
+		size:    size,
 	}, nil
 }
 
@@ -225,4 +220,3 @@ func GetOplogStats(session *mgo.Session, timeInterval time.Duration) (*OplogStat
 		gb / cr,
 	}, nil
 }
-

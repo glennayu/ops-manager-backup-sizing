@@ -1,4 +1,5 @@
 package components
+
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -6,39 +7,13 @@ import (
 )
 
 type SizeStats struct {
-	DataSize 	float64
-	IndexSize	float64
-	FileSize	float64
+	DataSize  float64
+	IndexSize float64
+	FileSize  float64
 }
 
-func GetDbPath(session *mgo.Session) (string, error) {
-	var results (bson.M)
-	session.DB("admin").Run(bson.D{{"getCmdLineOpts",1}}, &results)
-
-	parsed := results["parsed"].(bson.M)
-	v, err := getMongodVersion(session)
-	if err != nil {
-		return "", err
-	}
-
-	var dbpath string = "/data/db" // mongodb default
-	switch v[0:3]{
-	case "2.6" :
-		if parsed["dbpath"] != nil {
-			dbpath = parsed["dbpath"].(string)
-		}
-	default :
-		storage := parsed["storage"].(bson.M)
-		if storage["dbPath"] != nil {
-			dbpath = storage["dbPath"].(string)
-		}
-	}
-
-	return dbpath, err
-}
-
-func sumDirFiles(dir string, crawlFurther bool) (int64, error) {
-	files, err := getFilesInDir(dir, true)
+func sumDirFiles(dir string, storageEngine StorageEngine, crawlFurther bool) (int64, error) {
+	files, err := getFilesInDir(dir, storageEngine, true)
 	if err != nil {
 		return 0, err
 	}
@@ -59,7 +34,7 @@ func getWTFileSize(session *mgo.Session) (float64, error) {
 		return 0, err
 	}
 
-	fileSize, err := sumDirFiles(dbpath, true)
+	fileSize, err := sumDirFiles(dbpath, wiredTiger, true)
 	if err != nil {
 		return 0, err
 	}

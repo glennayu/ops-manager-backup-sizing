@@ -1,9 +1,9 @@
 package components
-import (
-	"testing"
-	"gopkg.in/mgo.v2"
-)
 
+import (
+	"gopkg.in/mgo.v2"
+	"testing"
+)
 
 func TestGetDbPath(test *testing.T) {
 	session := dial(wt_port_custPath)
@@ -38,9 +38,9 @@ func testCappedCollection(test *testing.T, port int) {
 	session := dial(port)
 	defer session.Close()
 
-	session.SetSafe(&mgo.Safe{W:1})
+	session.SetSafe(&mgo.Safe{W: 1})
 	session.DB(dbName).DropDatabase()
-	session.DB(dbName).C("capped").Create(&mgo.CollectionInfo{Capped:true, MaxBytes:4096})
+	session.DB(dbName).C("capped").Create(&mgo.CollectionInfo{Capped: true, MaxBytes: 4096})
 
 	sizes1, err := GetSizeStats(session)
 	if err != nil {
@@ -63,7 +63,7 @@ func testCappedCollection(test *testing.T, port int) {
 func testSizeStats(test *testing.T, port int) {
 	session := dial(port)
 	defer session.Close()
-	session.SetSafe(&mgo.Safe{W:1})
+	session.SetSafe(&mgo.Safe{W: 1})
 
 	session.DB(dbName).DropDatabase()
 
@@ -98,8 +98,8 @@ func testSizeStats(test *testing.T, port int) {
 	if err != nil {
 		test.Errorf("Failed to get sizes on port %i. Err %v", port, err)
 	}
-	if sizes3.FileSize != sizes2.FileSize {
-		test.Errorf("File size changed after removing documents. Before:%f, After:%f",
+	if sizes3.FileSize < sizes2.FileSize {
+		test.Errorf("File size decreased after removing documents. Before:%f, After:%f",
 			sizes2.FileSize, sizes3.FileSize)
 	}
 
@@ -125,4 +125,3 @@ func TestWTSizeStats(test *testing.T) {
 	testSizeStats(test, replset_wt_dirPerDb)
 	testCappedCollection(test, wt_port_defPath)
 }
-

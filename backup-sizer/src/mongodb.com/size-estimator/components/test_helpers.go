@@ -1,12 +1,12 @@
 package components
 
 import (
+	"bytes"
+	"crypto/rand"
+	"fmt"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"strconv"
-	"fmt"
-	"crypto/rand"
-	"bytes"
 )
 
 const standalone_mmap = 26000
@@ -72,7 +72,7 @@ func generateBytes(mongo *mgo.Session, database string, collection string, numBy
 		case bytesSame:
 			bytesVal = bytes.Repeat([]byte{0}, 5*1024)
 		case bytesRandom:
-			bytesVal = randomBytes(5*1024)
+			bytesVal = randomBytes(5 * 1024)
 		}
 		toAdd := &bson.D{
 			{"_id", bytesGenerated},
@@ -83,6 +83,3 @@ func generateBytes(mongo *mgo.Session, database string, collection string, numBy
 		bytesGenerated += 5 * 1024
 	}
 }
-
-
-

@@ -1,2 +1,3 @@
-github.com/go-mgo/mgo                       c735aed8f9ef6cce43c34b967f586da6906220ad gopkg.in=mgo.v2
-github.com/golang/snappy/snappy             ce8acff4829e0c2458a67ead32390ac0a381c862
+github.com/golang/snappy                    f4b10fa94214ba1b3d4068beeda8f920bf352cf0
+github.com/willf/bloom                      270f902f15edc2c6ae171c30f1de3ce3ae59d30c
+github.com/go-mgo/mgo/tree/v2               3569c88678d88179dcbd68d02ab081cbca3cd4d0
