@@ -232,7 +232,7 @@ error) {
 	bloomFilters := make(map[int]*bloom.BloomFilter)
 	hashFiles := make(map[int]*os.File)
 
-	dbpath, err := opts.GetDBPath()
+	dbpath, err := GetDbPath(opts.GetSession())
 	if err != nil {
 		return nil, err
 	}

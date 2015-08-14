@@ -110,13 +110,13 @@ func TestGetFilesInDir(test *testing.T) {
 
 
 func TestGetExcludeFileRegexes(test *testing.T) {
-	excludedFiles, err := GetExcludeFileRegexes(nil)
+	excludedFiles, err := getExcludeFileRegexes(nil)
 	if err == nil {
 		test.Errorf("Expected error from nil session. Received: %v, Error:%v", excludedFiles, err)
 	}
 
 	session := dial(replset_port)
-	excludedFiles, err = GetExcludeFileRegexes(session)
+	excludedFiles, err = getExcludeFileRegexes(session)
 	if err != nil {
 		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_port, err)
 	}
@@ -125,7 +125,7 @@ func TestGetExcludeFileRegexes(test *testing.T) {
 	}
 
 	session = dial(replset_wt_dirPerDb)
-	excludedFiles, err = GetExcludeFileRegexes(session)
+	excludedFiles, err = getExcludeFileRegexes(session)
 	if err != nil {
 		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_wt_dirPerDb, err)
 	}
@@ -134,7 +134,7 @@ func TestGetExcludeFileRegexes(test *testing.T) {
 	}
 
 	session = dial(wt_port_defPath)
-	excludedFiles, err = GetExcludeFileRegexes(session)
+	excludedFiles, err = getExcludeFileRegexes(session)
 	if err != nil {
 		test.Errorf("Error getting excluded files on port %d. Error: %v", wt_port_defPath, err)
 	}
