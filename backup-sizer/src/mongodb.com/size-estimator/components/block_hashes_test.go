@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"fmt"
 	"strconv"
 )
 
