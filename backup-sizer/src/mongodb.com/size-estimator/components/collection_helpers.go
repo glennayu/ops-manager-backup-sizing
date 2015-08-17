@@ -58,6 +58,10 @@ func getStorageEngine(session *mgo.Session) (StorageEngine, error) {
 		return "", err
 	}
 
+	// for versions prior to 3.0, serverStatus.storageEngine does not exist
+	if result["storageEngine"] == nil {
+		return mmap, nil
+	}
 	storageEngine := result["storageEngine"].(bson.M)
 	se := StorageEngine(storageEngine["name"].(string))
 	return se, nil
