@@ -53,7 +53,7 @@ func GetDbPath(session *mgo.Session) (string, error) {
 	}
 	var dbpath string = "/data/db" // mongodb default
 	switch v[0:3] {
-	case "2.6":
+	case "2.4":
 		if parsed["dbpath"] != nil {
 			dbpath = parsed["dbpath"].(string)
 		}
