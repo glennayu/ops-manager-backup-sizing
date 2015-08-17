@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"testing"
 	"strconv"
+	"testing"
 )
 
 const TestDataDir = "../../../../test_data"
@@ -54,7 +54,7 @@ func testBlockHashes(port int) (err error) {
 	uri := "localhost:" + strconv.Itoa(port)
 
 	opts := BackupSizingOpts{
-		Uri: uri,
+		Uri:          uri,
 		FalsePosRate: 0.01,
 		HashDir:      "hashes",
 		NumCPUs:      runtime.NumCPU(),
@@ -107,7 +107,7 @@ func TestReadFileNames(test *testing.T) {
 			if err != nil {
 				test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_port, err)
 			}
-		case _, open = <- fnCh:
+		case _, open = <-fnCh:
 		default:
 		}
 	}
@@ -126,7 +126,7 @@ func TestReadFileNames(test *testing.T) {
 			if err != nil {
 				test.Errorf("Error reading filenames for session on port %s. Error: %v", replset_port, err)
 			}
-		case _, open = <- fnCh:
+		case _, open = <-fnCh:
 		default:
 		}
 	}

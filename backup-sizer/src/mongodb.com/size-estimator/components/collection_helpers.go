@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"time"
 	"strings"
+	"time"
 )
 
 type StorageEngine string
@@ -66,7 +66,7 @@ func GetDbPath(session *mgo.Session) (string, error) {
 	return dbpath, err
 }
 
-func GetOplogCollStats(session *mgo.Session, result *bson.M) (error) {
+func GetOplogCollStats(session *mgo.Session, result *bson.M) error {
 	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, &result)
 	if err != nil {
 		return err
@@ -149,13 +149,12 @@ func getStorageEngine(session *mgo.Session) (StorageEngine, error) {
 	return se, nil
 }
 
-func serverStatus(session *mgo.Session, result *bson.M) (error) {
+func serverStatus(session *mgo.Session, result *bson.M) error {
 	if err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"oplog", 1}}, result); err != nil {
 		return err
 	}
 	return nil
 }
-
 
 /******* Methods on mongo collections *********/
 
@@ -220,7 +219,7 @@ func GetFilesInDir(dir string, excludeRegexes *[]string, crawlFurther bool) (*[]
 				return nil, err
 			}
 			files = append(files, *subDirFiles...)
-		} else if !fi.IsDir(){
+		} else if !fi.IsDir() {
 			files = append(files, absPath)
 		}
 	}
@@ -239,4 +238,3 @@ func excludeFile(exclude *[]string, fname string) (bool, error) {
 	}
 	return false, nil
 }
-

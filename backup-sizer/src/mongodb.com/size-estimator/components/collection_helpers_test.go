@@ -1,9 +1,9 @@
 package components
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
-	"os"
 )
 
 func TestGetStorageEngine(test *testing.T) {
@@ -108,7 +108,6 @@ func TestGetFilesInDir(test *testing.T) {
 		}
 	}
 }
-
 
 func TestGetExcludeFileRegexes(test *testing.T) {
 	excludedFiles, err := getExcludeFileRegexes(nil)

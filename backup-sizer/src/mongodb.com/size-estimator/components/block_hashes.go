@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/willf/bloom"
+	"gopkg.in/mgo.v2"
 	"io"
 	"io/ioutil"
 	"math"
@@ -15,7 +16,6 @@ import (
 	"sort"
 	"strconv"
 	"sync"
-	"gopkg.in/mgo.v2"
 )
 
 const kb = 1024
@@ -217,7 +217,7 @@ func bloomFilterParams(n int64, p float64) (m, k uint) {
 }
 
 func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*AllBlockSizeStats,
-error) {
+	error) {
 	const numFileSplitters = 3
 	const numBlockHashers = 3
 
