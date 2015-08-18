@@ -160,20 +160,24 @@ func getMongodVersion(session *mgo.Session) (string, error) {
 }
 
 func getOplogSize(session *mgo.Session) (int, error) {
-	var result (bson.M)
-	err := GetOplogCollStats(session, &result)
+	result := struct {
+		Capped bool `bson:"capped"`
+		MaxSize int64 `bson:"maxSize"`
+		Size int64 `bson:"size"`
+	} {}
+	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, &result)
+
 	if err != nil {
 		return -1, err
 	}
-
-	if result["capped"] == false {
+	if result.Capped == false {
 		return -1, errors.New("Oplog is not capped")
 	}
 
-	if result["maxSize"] != nil {
-		return result["maxSize"].(int), nil
+	if result.MaxSize != 0 {
+		return int(result.MaxSize), nil
 	}
-	return result["size"].(int), nil
+	return int(result.Size), nil
 }
 
 func getOplogColl(session *mgo.Session) (*mgo.Collection, error) {
