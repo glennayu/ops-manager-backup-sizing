@@ -75,7 +75,7 @@ func GetOplogCollStats(session *mgo.Session, result *bson.M) error {
 }
 
 // Returns database files relevant for backup, excludingq files based on storage engine
-func GetDBFiles(session *mgo.Session) (*[]string, error) {
+func GetDBFiles(session *mgo.Session) ([]string, error) {
 	excludeRegexes, err := getExcludeFileRegexes(session)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func GetDBFiles(session *mgo.Session) (*[]string, error) {
 	return GetFilesInDir(dbpath, excludeRegexes, true)
 }
 
-func getExcludeFileRegexes(session *mgo.Session) (*[]string, error) {
+func getExcludeFileRegexes(session *mgo.Session) ([]string, error) {
 	if session == nil {
 		return nil, fmt.Errorf("Failure to get regexes for files to exclude--session is nil")
 	}
@@ -104,10 +104,10 @@ func getExcludeFileRegexes(session *mgo.Session) (*[]string, error) {
 		oplogFile := getOplogFile(session)
 		excludeRegexes = []string{"mongod.lock", "WiredTiger.basecfg", "mongodb.log", "journal", oplogFile}
 	case mmap:
-		excludeRegexes = []string{"mongod.lock", "local.*", "mongodb.log", "journal"}
+		excludeRegexes = []string{"mongod.lock", `local\..+`, "mongodb.log", "journal"}
 	}
 
-	return &excludeRegexes, nil
+	return excludeRegexes, nil
 }
 
 // For WT replica sets only
@@ -182,7 +182,7 @@ func collExists(coll *mgo.Collection) (bool, error) {
 
 /************ getting files in a directory *******/
 
-func GetFilesInDir(dir string, excludeRegexes *[]string, crawlFurther bool) (*[]string, error) {
+func GetFilesInDir(dir string, excludeRegexes []string, crawlFurther bool) ([]string, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -218,16 +218,16 @@ func GetFilesInDir(dir string, excludeRegexes *[]string, crawlFurther bool) (*[]
 			if err != nil {
 				return nil, err
 			}
-			files = append(files, *subDirFiles...)
+			files = append(files, subDirFiles...)
 		} else if !fi.IsDir() {
 			files = append(files, absPath)
 		}
 	}
-	return &files, nil
+	return files, nil
 }
 
-func excludeFile(exclude *[]string, fname string) (bool, error) {
-	for _, excludeString := range *exclude {
+func excludeFile(exclude []string, fname string) (bool, error) {
+	for _, excludeString := range exclude {
 		match, err := regexp.Match(excludeString, ([]byte)(fname))
 		if err != nil {
 			return false, err

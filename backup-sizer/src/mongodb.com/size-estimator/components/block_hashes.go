@@ -30,10 +30,10 @@ func readFileNamesToChannel(session *mgo.Session, errCh chan error) (fnCh chan s
 		close(fnCh)
 		return
 	}
-	fnCh = make(chan string, len(*files))
+	fnCh = make(chan string, len(files))
 	defer close(fnCh)
 
-	for _, fname := range *files {
+	for _, fname := range files {
 		fnCh <- fname
 	}
 	return fnCh

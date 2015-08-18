@@ -18,7 +18,7 @@ func sumDirFiles(dir string, session *mgo.Session, crawlFurther bool) (int64, er
 		return 0, err
 	}
 	fileSize := int64(0)
-	for _, fname := range *files {
+	for _, fname := range files {
 		fi, err := os.Stat(fname)
 		if err != nil {
 			return 0, err

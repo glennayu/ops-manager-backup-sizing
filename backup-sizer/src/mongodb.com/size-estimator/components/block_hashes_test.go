@@ -143,11 +143,11 @@ func TestSplitFiles(test *testing.T) {
 		"partialblock.test": 6,
 	}
 	excludedFiles := []string{"journal", "local*"}
-	fns, err := GetFilesInDir(TestDataDir, &excludedFiles, false)
+	fns, err := GetFilesInDir(TestDataDir, excludedFiles, false)
 	if err != nil {
 		test.Fatalf(err.Error())
 	}
-	for _, fn := range *fns {
+	for _, fn := range fns {
 		blocks, err := splitFiles(fn)
 		if err != nil {
 			test.Errorf("Failed to split file %s into blocks. Error: %v", fn, err)
@@ -182,11 +182,11 @@ func TestHashAndCompressBlocks(test *testing.T) {
 	}
 
 	excludedFiles := []string{"local*", "journal"}
-	fns, err := GetFilesInDir(TestDataDir, &excludedFiles, true)
+	fns, err := GetFilesInDir(TestDataDir, excludedFiles, true)
 	if err != nil {
 		test.Fatalf(err.Error())
 	}
-	for _, fn := range *fns {
+	for _, fn := range fns {
 		f, err := os.Open(fn)
 		fn := filepath.Base(fn)
 		b, err := ioutil.ReadAll(f)

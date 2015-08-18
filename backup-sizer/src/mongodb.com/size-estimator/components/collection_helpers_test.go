@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"regexp"
 )
 
 func TestGetStorageEngine(test *testing.T) {
@@ -73,8 +74,8 @@ func TestGetFilesInDir(test *testing.T) {
 		test.Errorf("%s does not exist", empty_dir)
 	}
 
-	var files *[]string
-	files, err = GetFilesInDir("./DoesNotExist", &excludedFiles, true)
+	var files []string
+	files, err = GetFilesInDir("./DoesNotExist", excludedFiles, true)
 	if err == nil {
 		test.Errorf("Expected an error")
 	}
@@ -82,19 +83,19 @@ func TestGetFilesInDir(test *testing.T) {
 		test.Errorf("Return value from non-existant directory: %v", files)
 	}
 
-	files, err = GetFilesInDir(empty_dir, &excludedFiles, true)
-	if len(*files) != 0 {
+	files, err = GetFilesInDir(empty_dir, excludedFiles, true)
+	if len(files) != 0 {
 		test.Errorf("Return value from empty directory:%v", files)
 	}
 
-	files, err = GetFilesInDir(TestDataDir, &excludedFiles, true)
+	files, err = GetFilesInDir(TestDataDir, excludedFiles, true)
 	if err != nil {
 		test.Errorf("Failed getting files from test directory. %v", err)
 	}
-	if len(*files) != 4 {
-		test.Errorf("Expected 4 files. Received %d. Files returned: %v", len(*files), files)
+	if len(files) != 4 {
+		test.Errorf("Expected 4 files. Received %d. Files returned: %v", len(files), files)
 	}
-	for _, fn := range *files {
+	for _, fn := range files {
 		fi, err := os.Stat(fn)
 		if err != nil {
 			test.Errorf("Error with file %s. Error: &v", fn, err)
@@ -120,7 +121,7 @@ func TestGetExcludeFileRegexes(test *testing.T) {
 	if err != nil {
 		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_port, err)
 	}
-	if len(*excludedFiles) != 4 {
+	if len(excludedFiles) != 4 {
 		test.Errorf("Expected 4 regexes for session running on mmapv1. Received: %v", excludedFiles)
 	}
 
@@ -129,7 +130,7 @@ func TestGetExcludeFileRegexes(test *testing.T) {
 	if err != nil {
 		test.Errorf("Error getting excluded files on port %d. Error: %v", replset_wt_dirPerDb, err)
 	}
-	if len(*excludedFiles) != 5 {
+	if len(excludedFiles) != 5 {
 		test.Errorf("Expected 5 regexes for session running on wiredTiger. Received: %v", excludedFiles)
 	}
 
@@ -138,10 +139,47 @@ func TestGetExcludeFileRegexes(test *testing.T) {
 	if err != nil {
 		test.Errorf("Error getting excluded files on port %d. Error: %v", wt_port_defPath, err)
 	}
-	if len(*excludedFiles) != 5 {
+	if len(excludedFiles) != 5 {
 		test.Errorf("Expected 5 regexes for session running on wiredTiger without oplog. Received: %v", excludedFiles)
 	}
-	if (*excludedFiles)[4] != "" {
-		test.Errorf("Expected empty regex for oplog file. Received: %s", (*excludedFiles)[4])
+	if excludedFiles[4] != "" {
+		test.Errorf("Expected empty regex for oplog file. Received: %s", (excludedFiles)[4])
+	}
+}
+
+// Test only the regex to for the local files because the other ones are pretty straightforward.
+func TestLocalRegex(test *testing.T) {
+	testStrs := []string{
+		"local",
+		"local.",
+		"local0",
+		"localx.0",
+		"local.123",
+		"local.0",
+		"test.0",
+	}
+
+	testRes := []bool{
+		false,
+		false,
+		false,
+		false,
+		true,
+		true,
+		false,
+	}
+
+	localPattern := `local\..+`
+
+	for i, t := range testStrs {
+
+		match, err := regexp.Match(localPattern, []byte(t));
+		if err != nil {
+			test.Errorf("Error matching regex. Pattern: %s, Testing on: %s. Error: %v", localPattern, t, err);
+		}
+		if match != testRes[i] {
+			test.Errorf("Incorrect result from regex. Pattern: %s, testing on: %s. Expected: %t, received: %t",
+				localPattern, t, testRes[i], match);
+		}
 	}
 }
