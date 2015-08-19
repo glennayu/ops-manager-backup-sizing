@@ -55,10 +55,10 @@ func GetSizeStats(session *mgo.Session) (*SizeStats, error) {
 	fs := false
 
 	results := struct {
-		DataSize int64 `bson:"dataSize"`
-		FileSize int64 `bson:"fileSize"`
+		DataSize  int64 `bson:"dataSize"`
+		FileSize  int64 `bson:"fileSize"`
 		IndexSize int64 `bson:"indexSize"`
-	} {}
+	}{}
 	for _, db := range dbs {
 		if err := session.DB(db).Run(bson.D{{"dbStats", 1}}, &results); err != nil {
 			return nil, err
