@@ -66,8 +66,8 @@ func GetDbPath(session *mgo.Session) (string, error) {
 	return dbpath, err
 }
 
-func GetOplogCollStats(session *mgo.Session, result *bson.M) error {
-	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, &result)
+func GetOplogCollStats(session *mgo.Session, result interface{}) error {
+	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, result)
 	if err != nil {
 		return err
 	}

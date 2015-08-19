@@ -165,8 +165,8 @@ func getOplogSize(session *mgo.Session) (int, error) {
 		MaxSize int64 `bson:"maxSize"`
 		Size int64 `bson:"size"`
 	} {}
-	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, &result)
 
+	err := GetOplogCollStats(session, &result)
 	if err != nil {
 		return -1, err
 	}
