@@ -13,13 +13,13 @@ import (
 type OplogInfo struct {
 	startTS bson.MongoTimestamp
 	endTS   bson.MongoTimestamp
-	size    int
+	size    int64
 }
 
 type OplogStats struct {
 	StartTS            bson.MongoTimestamp
 	EndTS              bson.MongoTimestamp
-	Size               int
+	Size               int64
 	GbPerDay           float64
 	CompressionRatio   float64
 	CompressedGbPerDay float64
@@ -159,21 +159,25 @@ func getMongodVersion(session *mgo.Session) (string, error) {
 	return result["version"].(string), nil
 }
 
-func getOplogSize(session *mgo.Session) (int, error) {
-	var result (bson.M)
+func getOplogSize(session *mgo.Session) (int64, error) {
+	result := struct {
+		Capped  bool  `bson:"capped"`
+		MaxSize int64 `bson:"maxSize"`
+		Size    int64 `bson:"size"`
+	}{}
+
 	err := GetOplogCollStats(session, &result)
 	if err != nil {
 		return -1, err
 	}
-
-	if result["capped"] == false {
+	if result.Capped == false {
 		return -1, errors.New("Oplog is not capped")
 	}
 
-	if result["maxSize"] != nil {
-		return result["maxSize"].(int), nil
+	if result.MaxSize != 0 {
+		return result.MaxSize, nil
 	}
-	return result["size"].(int), nil
+	return result.Size, nil
 }
 
 func getOplogColl(session *mgo.Session) (*mgo.Collection, error) {

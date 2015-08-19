@@ -7,9 +7,9 @@ import (
 )
 
 type SizeStats struct {
-	DataSize  float64
-	IndexSize float64
-	FileSize  float64
+	DataSize  int64
+	IndexSize int64
+	FileSize  int64
 }
 
 func sumDirFiles(dir string, session *mgo.Session, crawlFurther bool) (int64, error) {
@@ -28,7 +28,7 @@ func sumDirFiles(dir string, session *mgo.Session, crawlFurther bool) (int64, er
 	return fileSize, nil
 }
 
-func getWTFileSize(session *mgo.Session) (float64, error) {
+func getWTFileSize(session *mgo.Session) (int64, error) {
 	dbpath, err := GetDbPath(session)
 	if err != nil {
 		return 0, err
@@ -39,7 +39,7 @@ func getWTFileSize(session *mgo.Session) (float64, error) {
 		return 0, err
 	}
 
-	return float64(fileSize), nil
+	return int64(fileSize), nil
 }
 
 func GetSizeStats(session *mgo.Session) (*SizeStats, error) {
@@ -48,22 +48,26 @@ func GetSizeStats(session *mgo.Session) (*SizeStats, error) {
 		return nil, err
 	}
 
-	dataSize := float64(0)
-	fileSize := float64(0)
-	indexSize := float64(0)
+	dataSize := int64(0)
+	fileSize := int64(0)
+	indexSize := int64(0)
 
 	fs := false
 
-	var results (bson.M)
+	results := struct {
+		DataSize  int64 `bson:"dataSize"`
+		FileSize  int64 `bson:"fileSize"`
+		IndexSize int64 `bson:"indexSize"`
+	}{}
 	for _, db := range dbs {
 		if err := session.DB(db).Run(bson.D{{"dbStats", 1}}, &results); err != nil {
 			return nil, err
 		}
-		dataSize += results["dataSize"].(float64)
-		indexSize += results["indexSize"].(float64)
-		v := results["fileSize"]
-		if v != nil {
-			fileSize += v.(float64)
+		dataSize += results.DataSize
+		indexSize += results.IndexSize
+		v := results.FileSize
+		if v != 0 {
+			fileSize += v
 			fs = true
 		}
 	}

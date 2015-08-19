@@ -3,8 +3,8 @@ package components
 import (
 	"os"
 	"path/filepath"
-	"testing"
 	"regexp"
+	"testing"
 )
 
 func TestGetStorageEngine(test *testing.T) {
@@ -173,13 +173,13 @@ func TestLocalRegex(test *testing.T) {
 
 	for i, t := range testStrs {
 
-		match, err := regexp.Match(localPattern, []byte(t));
+		match, err := regexp.Match(localPattern, []byte(t))
 		if err != nil {
-			test.Errorf("Error matching regex. Pattern: %s, Testing on: %s. Error: %v", localPattern, t, err);
+			test.Errorf("Error matching regex. Pattern: %s, Testing on: %s. Error: %v", localPattern, t, err)
 		}
 		if match != testRes[i] {
 			test.Errorf("Incorrect result from regex. Pattern: %s, testing on: %s. Expected: %t, received: %t",
-				localPattern, t, testRes[i], match);
+				localPattern, t, testRes[i], match)
 		}
 	}
 }
