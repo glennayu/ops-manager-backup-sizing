@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/willf/bloom"
+	"gopkg.in/mgo.v2"
 	"io"
 	"io/ioutil"
 	"math"
@@ -21,8 +22,8 @@ const kb = 1024
 const blockSizeBytes = 64 * kb
 const hashSize = 65
 
-func readFileNamesToChannel(dir string, storageEngine StorageEngine, errCh chan error) (fnCh chan string) {
-	files, err := getFilesInDir(dir, storageEngine, true)
+func readFileNamesToChannel(session *mgo.Session, errCh chan error) (fnCh chan string) {
+	files, err := GetDBFiles(session)
 	if err != nil {
 		errCh <- err
 		fnCh = make(chan string)
@@ -215,9 +216,8 @@ func bloomFilterParams(n int64, p float64) (m, k uint) {
 	return
 }
 
-func GetBlockHashes(opts *BackupSizingOpts, dbpath string, blocksizes []int, iteration int) (*AllBlockSizeStats,
+func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*AllBlockSizeStats,
 	error) {
-
 	const numFileSplitters = 3
 	const numBlockHashers = 3
 
@@ -229,7 +229,11 @@ func GetBlockHashes(opts *BackupSizingOpts, dbpath string, blocksizes []int, ite
 	bloomFilters := make(map[int]*bloom.BloomFilter)
 	hashFiles := make(map[int]*os.File)
 
-	dbpath, err := filepath.Abs(dbpath)
+	dbpath, err := GetDbPath(opts.GetSession())
+	if err != nil {
+		return nil, err
+	}
+	dbpath, err = filepath.Abs(dbpath)
 	if err != nil {
 		return nil, err
 	}
@@ -301,11 +305,7 @@ func GetBlockHashes(opts *BackupSizingOpts, dbpath string, blocksizes []int, ite
 	}()
 
 	// load up all the filenames into fnCh
-	storageEngine, err := opts.GetStorageEngine()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get storage engine for session on port %s. Err: %v", opts.Uri, err)
-	}
-	fnCh := readFileNamesToChannel(dbpath, storageEngine, errCh)
+	fnCh := readFileNamesToChannel(opts.GetSession(), errCh)
 
 	// numFileSplitters + len(blocksCh) + numBlockHashers  max number of slices that can be in use at one time
 	numSlices := numFileSplitters*2 + numBlockHashers

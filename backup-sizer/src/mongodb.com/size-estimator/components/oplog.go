@@ -161,11 +161,11 @@ func getMongodVersion(session *mgo.Session) (string, error) {
 
 func getOplogSize(session *mgo.Session) (int, error) {
 	var result (bson.M)
-	err := session.DB("local").Run(bson.D{{"collStats", "oplog.rs"}}, &result)
-
+	err := GetOplogCollStats(session, &result)
 	if err != nil {
 		return -1, err
 	}
+
 	if result["capped"] == false {
 		return -1, errors.New("Oplog is not capped")
 	}

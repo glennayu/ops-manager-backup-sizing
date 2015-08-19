@@ -5,25 +5,6 @@ import (
 	"testing"
 )
 
-func TestGetDbPath(test *testing.T) {
-	session := dial(wt_port_custPath)
-	defer session.Close()
-	path, err := GetDbPath(session)
-	if err != nil {
-		test.Errorf("Failed to get dbpath on port %i. Err %v", wt_port_custPath, err)
-	}
-
-	sess_defPath := dial(wt_port_defPath)
-	defer sess_defPath.Close()
-	path, err = GetDbPath(sess_defPath)
-	if err != nil {
-		test.Errorf("Failed to get dbpath on port %i. Err %v", wt_port_defPath, err)
-	}
-	if path != "/data/db" {
-		test.Errorf("Expected default path '/data/db'. Received %s", path)
-	}
-}
-
 func TestIncorrectPermissions(test *testing.T) {
 	session_root := dial(wt_root)
 	defer session_root.Close()
