@@ -46,6 +46,7 @@ func NewOptionsFromCmdLine() BackupSizingOpts {
 	flag.StringVar(&opts.HashDir, "hashDir", DefaultHashDir, "Directory to store block hashes")
 	flag.Float64Var(&opts.FalsePosRate, "falsePos", DefaultFalsePosRate, "False positive rate for duplicated hashes")
 	flag.IntVar(&opts.NumCPUs, "numCPUs", runtime.NumCPU(), "Max number of CPUs to use")
+	flag.BoolVar(&opts.Verbose, "verbose", false, "Print extra output for debugging purposes.")
 	flag.Parse()
 
 	opts.Uri = fmt.Sprintf("%s:%d", opts.Host, opts.Port)

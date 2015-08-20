@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 )
 
 const kb = 1024
@@ -218,8 +219,8 @@ func bloomFilterParams(n int64, p float64) (m, k uint) {
 
 func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*AllBlockSizeStats,
 	error) {
-	const numFileSplitters = 3
-	const numBlockHashers = 3
+	numFileSplitters := opts.NumCPUs
+	numBlockHashers := opts.NumCPUs
 
 	hashpath := opts.HashDir
 	bfFalsePos := opts.FalsePosRate
@@ -245,6 +246,8 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 	}
 	hashpath += "/"
 
+	// loading in previous hashes.
+	startTime := time.Now();
 	for _, s := range blocksizes {
 		path := hashpath + strconv.Itoa(s)
 		exists, err := CheckExists(path)
@@ -275,7 +278,11 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 		}
 		bloomFilters[s] = bloomFilter
 	}
+	if opts.Verbose {
+		fmt.Printf("Time spent loading hashes: %v\n", time.Since(startTime))
+	}
 
+	// setting up channels for error handling
 	errCh := make(chan error)
 	finalErr := make(chan error)
 
@@ -323,6 +330,24 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 		emptyBlocksCh <- b
 	}
 
+
+	if opts.Verbose {
+		go func() {
+			for {
+				fmt.Printf("Num Empty Blocks available: %d, of total: %d\n", len(emptyBlocksCh),  cap(emptyBlocksCh))
+				fmt.Printf("Num Blocks to process: %d, of total: %d\n", len(blocksCh),  cap(blocksCh))
+				fmt.Printf("Num Hashes to compare and look at: %d, of total: %d\n", len(hashCh),  cap(hashCh))
+				time.Sleep(5*time.Second)
+				fmt.Println()
+			}
+		} ()
+	}
+
+	// Split files into blocks -
+	// Each file splitter take a file from fnCh, takes empty blocks from the emptyBlocksCh,
+	// reads the file into the empty blocks, and pushes the filled block onto blocksCh.
+	// inputs from: fnCh, emptyBlocksCh
+	// outputs to: blocksCh
 	for i := 0; i < numFileSplitters; i++ {
 		blocksWG.Add(1)
 		go func() {
@@ -343,6 +368,7 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 					if len(b) != maxBlockSize || cap(b) != maxBlockSize {
 						b = b[:cap(b)]
 					}
+					// read the next block of the file into the empty block b, with end padding trimmed
 					block, err := blocks(b)
 					if block == nil {
 						if err != nil {
@@ -357,6 +383,9 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 		}()
 	}
 
+	// Hash and compress blocks -
+	// Each block hasher takes a block from blocksCh and for each possible blocksize, hashes and compresses
+	// blocks of that size and adds result to hashCh, dumps block back into emptyBlocksCh
 	for i := 0; i < numBlockHashers; i++ {
 		hashWG.Add(1)
 		go func() {
@@ -382,6 +411,8 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 		}()
 	}
 
+	// Final processing of blocks - takes hashes from hashCh, compares them to hashes loaded into the
+	// bloomfilter, sums up results for compression ratio and dedup rates.
 	go func() {
 		allStats := AllBlockSizeStats{}
 		for _, bs := range blocksizes {
@@ -412,6 +443,7 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 			}
 		}
 
+		// do final calculations to prepare results
 		for _, bs := range blocksizes {
 			stat := allStats[bs]
 			stat.DataCompressionRatio = float64(stat.uncompressedTotal) / float64(stat.compressedTotal)
