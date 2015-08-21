@@ -247,7 +247,7 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 	hashpath += "/"
 
 	// loading in previous hashes.
-	startTime := time.Now();
+	startTime := time.Now()
 	for _, s := range blocksizes {
 		path := hashpath + strconv.Itoa(s)
 		exists, err := CheckExists(path)
@@ -330,17 +330,16 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 		emptyBlocksCh <- b
 	}
 
-
 	if opts.Verbose {
 		go func() {
 			for {
-				fmt.Printf("Num Empty Blocks available: %d, of total: %d\n", len(emptyBlocksCh),  cap(emptyBlocksCh))
-				fmt.Printf("Num Blocks to process: %d, of total: %d\n", len(blocksCh),  cap(blocksCh))
-				fmt.Printf("Num Hashes to compare and look at: %d, of total: %d\n", len(hashCh),  cap(hashCh))
-				time.Sleep(5*time.Second)
+				fmt.Printf("Num Empty Blocks available: %d, of total: %d\n", len(emptyBlocksCh), cap(emptyBlocksCh))
+				fmt.Printf("Num Blocks to process: %d, of total: %d\n", len(blocksCh), cap(blocksCh))
+				fmt.Printf("Num Hashes to compare and look at: %d, of total: %d\n", len(hashCh), cap(hashCh))
+				time.Sleep(5 * time.Second)
 				fmt.Println()
 			}
-		} ()
+		}()
 	}
 
 	// Split files into blocks -

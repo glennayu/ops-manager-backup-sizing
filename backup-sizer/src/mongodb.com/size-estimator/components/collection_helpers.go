@@ -29,7 +29,7 @@ type BackupSizingOpts struct {
 	HashDir      string
 	FalsePosRate float64
 	NumCPUs      int
-	Verbose		 bool
+	Verbose      bool
 }
 
 func (opts BackupSizingOpts) GetSession() *mgo.Session {
