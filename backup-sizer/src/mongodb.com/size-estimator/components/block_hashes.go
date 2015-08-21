@@ -321,6 +321,7 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 	blocksCh := make(chan []byte, numFileSplitters)
 	hashCh := make(chan Block, numBlockHashers)
 	crResChan := make(chan AllBlockSizeStats)
+	quitCh := make(chan bool)
 
 	var blocksWG sync.WaitGroup
 	var hashWG sync.WaitGroup
@@ -333,11 +334,17 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 	if opts.Verbose {
 		go func() {
 			for {
-				fmt.Printf("Num Empty Blocks available: %d, of total: %d\n", len(emptyBlocksCh), cap(emptyBlocksCh))
-				fmt.Printf("Num Blocks to process: %d, of total: %d\n", len(blocksCh), cap(blocksCh))
-				fmt.Printf("Num Hashes to compare and look at: %d, of total: %d\n", len(hashCh), cap(hashCh))
-				time.Sleep(5 * time.Second)
-				fmt.Println()
+				select {
+				case <-quitCh:
+					return
+				default:
+					fmt.Println(iteration)
+					fmt.Printf("Num Empty Blocks available: %d, of total: %d\n", len(emptyBlocksCh), cap(emptyBlocksCh))
+					fmt.Printf("Num Blocks to process: %d, of total: %d\n", len(blocksCh), cap(blocksCh))
+					fmt.Printf("Num Hashes to compare and look at: %d, of total: %d\n", len(hashCh), cap(hashCh))
+					time.Sleep(5*time.Second)
+					fmt.Println()
+				}
 			}
 		}()
 	}
@@ -461,6 +468,8 @@ func GetBlockHashes(opts *BackupSizingOpts, blocksizes []int, iteration int) (*A
 
 	res := <-crResChan
 	close(errCh)
+
+	close(quitCh)
 
 	err = <-finalErr
 	if err != nil {
